@@ -8,7 +8,7 @@ Guardrisk operating platform built with **Blazor WebAssembly + FastAPI + Postgre
 - `apps/api` — FastAPI backend and business rules
 - PostgreSQL — system of record
 - Redis — cache, realtime/event infrastructure and background-work foundation
-- Alembic — all PostgreSQL schema migrations and controlled reference-data migrations
+- Alembic — mandatory PostgreSQL schema and controlled reference-data migrations
 - Docker Compose — local/application stack
 - GitHub Actions — backend, migration, frontend and container validation
 
@@ -37,7 +37,9 @@ In active development on `feature/phase-3-insurance`:
 
 ## Database migrations
 
-Alembic is mandatory for schema changes. Current migration chain:
+Alembic is mandatory for every PostgreSQL schema change. Do not create, alter or drop application tables manually in production. Reference data that must exist consistently in every environment can also be delivered through a reviewed Alembic migration.
+
+Current migration chain:
 
 1. `20260907_0001_core_identity`
 2. `20260907_0002_crm_customers`
@@ -50,7 +52,16 @@ Apply migrations from `apps/api`:
 python -m alembic upgrade head
 ```
 
-CI also runs `alembic check` and a downgrade/upgrade smoke test to detect model drift and broken migration reversibility.
+CI validates the migration chain with:
+
+```bash
+python -m alembic upgrade head
+python -m alembic check
+python -m alembic downgrade -1
+python -m alembic upgrade head
+```
+
+This catches unapplied model drift and basic migration rollback/forward failures before merge.
 
 ## Development workflow
 
