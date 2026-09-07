@@ -33,7 +33,7 @@
     </article>
     <article>
         <span>Quoted premium</span>
-        <strong>M @quotes.Sum(q => q.Premium).ToString("N2")</strong>
+        <strong>M @quotes.Where(q => q.Currency == "LSL").Sum(q => q.Premium).ToString("N2")</strong>
     </article>
 </section>
 
@@ -272,6 +272,14 @@
             return;
         }
 
+        var startDate = ParseDate(draft.StartDate);
+        var endDate = ParseDate(draft.EndDate);
+        if (startDate is not null && endDate is not null && endDate < startDate)
+        {
+            SetMessage("Cover end date cannot be before the start date.", true);
+            return;
+        }
+
         saving = true;
         try
         {
@@ -283,8 +291,8 @@
                 SumInsured = draft.SumInsured,
                 Premium = draft.Premium,
                 ThirdPartyLimit = draft.ThirdPartyLimit > 0 ? draft.ThirdPartyLimit : null,
-                StartDate = ParseDate(draft.StartDate),
-                EndDate = ParseDate(draft.EndDate),
+                StartDate = startDate,
+                EndDate = endDate,
                 Notes = string.IsNullOrWhiteSpace(draft.Notes) ? null : draft.Notes.Trim()
             };
 
