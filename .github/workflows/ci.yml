@@ -74,6 +74,12 @@ jobs:
       - name: Apply database migrations
         run: python -m alembic upgrade head
 
+      - name: Verify Alembic model sync
+        run: python -m alembic check
+
+      - name: Migration rollback smoke test
+        run: python -m alembic downgrade -1 && python -m alembic upgrade head
+
       - name: Pytest
         run: python -m pytest -q
 
