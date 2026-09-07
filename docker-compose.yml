@@ -31,11 +31,12 @@ services:
   api:
     build:
       context: ./apps/api
-    env_file:
-      - .env
     environment:
+      GRISK_ENV: ${GRISK_ENV:-development}
+      GRISK_SECRET_KEY: ${GRISK_SECRET_KEY:-change-me}
       GRISK_DATABASE_URL: ${GRISK_DATABASE_URL:-postgresql+asyncpg://grisk:grisk@postgres:5432/grisk}
       GRISK_REDIS_URL: ${GRISK_REDIS_URL:-redis://redis:6379/0}
+      GRISK_CORS_ORIGINS: ${GRISK_CORS_ORIGINS:-http://localhost:8080}
     ports:
       - "8000:8000"
     depends_on:
