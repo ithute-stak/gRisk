@@ -19,32 +19,17 @@
 }
 
 <section class="quote-metrics">
-    <article>
-        <span>Total quotations</span>
-        <strong>@quotes.Count</strong>
-    </article>
-    <article>
-        <span>Under review</span>
-        <strong>@quotes.Count(q => q.Status is "review" or "submitted")</strong>
-    </article>
-    <article>
-        <span>Accepted</span>
-        <strong>@quotes.Count(q => q.Status == "accepted")</strong>
-    </article>
-    <article>
-        <span>Quoted premium</span>
-        <strong>M @quotes.Where(q => q.Currency == "LSL").Sum(q => q.Premium).ToString("N2")</strong>
-    </article>
+    <article><span>Total quotations</span><strong>@quotes.Count</strong></article>
+    <article><span>Under review</span><strong>@quotes.Count(q => q.Status is "review" or "submitted")</strong></article>
+    <article><span>Accepted</span><strong>@quotes.Count(q => q.Status == "accepted")</strong></article>
+    <article><span>Quoted premium</span><strong>M @quotes.Where(q => q.Currency == "LSL").Sum(q => q.Premium).ToString("N2")</strong></article>
 </section>
 
 @if (showComposer)
 {
     <section class="quote-card composer">
         <div class="section-title">
-            <div>
-                <p class="eyebrow">New business</p>
-                <h2>Create quotation</h2>
-            </div>
+            <div><p class="eyebrow">New business</p><h2>Create quotation</h2></div>
             <span class="status-pill draft">Draft</span>
         </div>
 
@@ -69,18 +54,9 @@
                     }
                 </select>
             </label>
-            <label>
-                Sum insured (M)
-                <input type="number" min="0" step="0.01" @bind="draft.SumInsured" />
-            </label>
-            <label>
-                Premium (M)
-                <input type="number" min="0" step="0.01" @bind="draft.Premium" />
-            </label>
-            <label>
-                Third-party limit (M)
-                <input type="number" min="0" step="0.01" @bind="draft.ThirdPartyLimit" />
-            </label>
+            <label>Sum insured (M)<input type="number" min="0" step="0.01" @bind="draft.SumInsured" /></label>
+            <label>Premium (M)<input type="number" min="0" step="0.01" @bind="draft.Premium" /></label>
+            <label>Third-party limit (M)<input type="number" min="0" step="0.01" @bind="draft.ThirdPartyLimit" /></label>
             <label>
                 Currency
                 <select @bind="draft.Currency">
@@ -88,14 +64,8 @@
                     <option value="ZAR">ZAR · Rand</option>
                 </select>
             </label>
-            <label>
-                Cover start
-                <input type="date" @bind="draft.StartDate" />
-            </label>
-            <label>
-                Cover end
-                <input type="date" @bind="draft.EndDate" />
-            </label>
+            <label>Cover start<input type="date" @bind="draft.StartDate" /></label>
+            <label>Cover end<input type="date" @bind="draft.EndDate" /></label>
             <label class="wide-field">
                 Notes / scope of cover
                 <textarea rows="3" @bind="draft.Notes" placeholder="Project, risk description, exclusions or underwriting notes"></textarea>
@@ -111,18 +81,11 @@
 
 <section class="quote-card">
     <div class="toolbar">
-        <div class="search-box">
-            <input placeholder="Search quote number" @bind="search" @bind:event="oninput" />
-        </div>
+        <div class="search-box"><input placeholder="Search quote number" @bind="search" @bind:event="oninput" /></div>
         <select @bind="statusFilter">
-            <option value="">All statuses</option>
-            <option value="draft">Draft</option>
-            <option value="review">Review</option>
-            <option value="submitted">Submitted</option>
-            <option value="accepted">Accepted</option>
-            <option value="converted">Converted</option>
-            <option value="declined">Declined</option>
-            <option value="expired">Expired</option>
+            <option value="">All statuses</option><option value="draft">Draft</option><option value="review">Review</option>
+            <option value="submitted">Submitted</option><option value="accepted">Accepted</option><option value="converted">Converted</option>
+            <option value="declined">Declined</option><option value="expired">Expired</option>
         </select>
         <button class="secondary-action" @onclick="LoadQuotesAsync">Refresh</button>
     </div>
@@ -133,60 +96,32 @@
     }
     else if (FilteredQuotes.Count == 0)
     {
-        <div class="empty-state">
-            <strong>No quotations found.</strong>
-            <span>Create the first quotation or change the filters.</span>
-        </div>
+        <div class="empty-state"><strong>No quotations found.</strong><span>Create the first quotation or change the filters.</span></div>
     }
     else
     {
         <div class="table-wrap">
             <table class="quote-table">
-                <thead>
-                    <tr>
-                        <th>Quotation</th>
-                        <th>Customer</th>
-                        <th>Product</th>
-                        <th>Sum insured</th>
-                        <th>Premium</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>Quotation</th><th>Customer</th><th>Product</th><th>Sum insured</th><th>Premium</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>
                     @foreach (var quote in FilteredQuotes)
                     {
                         <tr>
-                            <td>
-                                <strong>@quote.QuoteNumber</strong>
-                                <small>@quote.CreatedAt.LocalDateTime.ToString("dd MMM yyyy")</small>
-                            </td>
-                            <td>@CustomerName(quote.CustomerId)</td>
-                            <td>@ProductName(quote.ProductId)</td>
-                            <td>@Money(quote.Currency, quote.SumInsured)</td>
-                            <td>@Money(quote.Currency, quote.Premium)</td>
+                            <td><strong>@quote.QuoteNumber</strong><small>@quote.CreatedAt.LocalDateTime.ToString("dd MMM yyyy")</small></td>
+                            <td>@CustomerName(quote.CustomerId)</td><td>@ProductName(quote.ProductId)</td>
+                            <td>@Money(quote.Currency, quote.SumInsured)</td><td>@Money(quote.Currency, quote.Premium)</td>
                             <td><span class="status-pill @quote.Status">@quote.Status</span></td>
                             <td class="row-actions">
                                 @if (quote.Status == "draft")
-                                {
-                                    <button @onclick="() => ChangeStatusAsync(quote.Id, StatusReview)">Send to review</button>
-                                }
+                                {<button @onclick="() => ChangeStatusAsync(quote.Id, StatusReview)">Send to review</button>}
                                 else if (quote.Status == "review")
-                                {
-                                    <button @onclick="() => ChangeStatusAsync(quote.Id, StatusSubmitted)">Submit</button>
-                                }
+                                {<button @onclick="() => ChangeStatusAsync(quote.Id, StatusSubmitted)">Submit</button>}
                                 else if (quote.Status == "submitted")
-                                {
-                                    <button @onclick="() => ChangeStatusAsync(quote.Id, StatusAccepted)">Accept</button>
-                                }
+                                {<button @onclick="() => ChangeStatusAsync(quote.Id, StatusAccepted)">Accept</button>}
                                 else if (quote.Status == "accepted")
-                                {
-                                    <button class="convert" @onclick="() => ConvertAsync(quote)">Issue policy</button>
-                                }
+                                {<button class="convert" @onclick="() => ConvertAsync(quote)">Issue policy</button>}
                                 else
-                                {
-                                    <span class="muted">No action</span>
-                                }
+                                {<span class="muted">No action</span>}
                             </td>
                         </tr>
                     }
@@ -200,7 +135,6 @@
     private const string StatusReview = "review";
     private const string StatusSubmitted = "submitted";
     private const string StatusAccepted = "accepted";
-
     private readonly List<QuoteModel> quotes = [];
     private readonly List<CustomerSummary> customers = [];
     private readonly List<InsuranceProductModel> products = [];
@@ -215,8 +149,7 @@
 
     private List<QuoteModel> FilteredQuotes => quotes
         .Where(q => string.IsNullOrWhiteSpace(search) || q.QuoteNumber.Contains(search, StringComparison.OrdinalIgnoreCase))
-        .Where(q => string.IsNullOrWhiteSpace(statusFilter) || q.Status == statusFilter)
-        .ToList();
+        .Where(q => string.IsNullOrWhiteSpace(statusFilter) || q.Status == statusFilter).ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -228,150 +161,66 @@
     {
         try
         {
-            products.Clear();
-            products.AddRange(await Insurance.GetProductsAsync());
-            customers.Clear();
-            customers.AddRange((await Insurance.GetCustomersAsync()).Items);
+            products.Clear(); products.AddRange(await Insurance.GetProductsAsync());
+            customers.Clear(); customers.AddRange((await Insurance.GetCustomersAsync()).Items);
         }
-        catch (Exception ex)
-        {
-            SetMessage(ex.Message, true);
-        }
+        catch (Exception ex) { SetMessage(ex.Message, true); }
     }
 
     private async Task LoadQuotesAsync()
     {
         loading = true;
-        try
-        {
-            var result = await Insurance.GetQuotesAsync();
-            quotes.Clear();
-            quotes.AddRange(result.Items);
-        }
-        catch (Exception ex)
-        {
-            SetMessage(ex.Message, true);
-        }
-        finally
-        {
-            loading = false;
-        }
+        try { var result = await Insurance.GetQuotesAsync(); quotes.Clear(); quotes.AddRange(result.Items); }
+        catch (Exception ex) { SetMessage(ex.Message, true); }
+        finally { loading = false; }
     }
 
     private async Task CreateQuoteAsync()
     {
-        if (draft.CustomerId == Guid.Empty || draft.ProductId == Guid.Empty)
-        {
-            SetMessage("Select both a customer and an insurance product.", true);
-            return;
-        }
-
-        if (draft.SumInsured <= 0)
-        {
-            SetMessage("Sum insured must be greater than zero.", true);
-            return;
-        }
-
-        var startDate = ParseDate(draft.StartDate);
-        var endDate = ParseDate(draft.EndDate);
-        if (startDate is not null && endDate is not null && endDate < startDate)
-        {
-            SetMessage("Cover end date cannot be before the start date.", true);
-            return;
-        }
+        if (draft.CustomerId == Guid.Empty || draft.ProductId == Guid.Empty) { SetMessage("Select both a customer and an insurance product.", true); return; }
+        if (draft.SumInsured <= 0) { SetMessage("Sum insured must be greater than zero.", true); return; }
+        if (draft.EndDate.Date < draft.StartDate.Date) { SetMessage("Cover end date cannot be before the start date.", true); return; }
 
         saving = true;
         try
         {
             var request = new CreateQuoteRequest
             {
-                CustomerId = draft.CustomerId,
-                ProductId = draft.ProductId,
-                Currency = draft.Currency,
-                SumInsured = draft.SumInsured,
-                Premium = draft.Premium,
+                CustomerId = draft.CustomerId, ProductId = draft.ProductId, Currency = draft.Currency,
+                SumInsured = draft.SumInsured, Premium = draft.Premium,
                 ThirdPartyLimit = draft.ThirdPartyLimit > 0 ? draft.ThirdPartyLimit : null,
-                StartDate = startDate,
-                EndDate = endDate,
+                StartDate = DateOnly.FromDateTime(draft.StartDate), EndDate = DateOnly.FromDateTime(draft.EndDate),
                 Notes = string.IsNullOrWhiteSpace(draft.Notes) ? null : draft.Notes.Trim()
             };
-
             var created = await Insurance.CreateQuoteAsync(request);
-            quotes.Insert(0, created);
-            ResetDraft();
-            showComposer = false;
+            quotes.Insert(0, created); ResetDraft(); showComposer = false;
             SetMessage($"Quotation {created.QuoteNumber} created successfully.", false);
         }
-        catch (Exception ex)
-        {
-            SetMessage(ex.Message, true);
-        }
-        finally
-        {
-            saving = false;
-        }
+        catch (Exception ex) { SetMessage(ex.Message, true); }
+        finally { saving = false; }
     }
 
     private async Task ChangeStatusAsync(Guid quoteId, string nextStatus)
     {
-        try
-        {
-            var updated = await Insurance.UpdateQuoteStatusAsync(quoteId, nextStatus);
-            ReplaceQuote(updated);
-            SetMessage($"Quotation {updated.QuoteNumber} moved to {updated.Status}.", false);
-        }
-        catch (Exception ex)
-        {
-            SetMessage(ex.Message, true);
-        }
+        try { var updated = await Insurance.UpdateQuoteStatusAsync(quoteId, nextStatus); ReplaceQuote(updated); SetMessage($"Quotation {updated.QuoteNumber} moved to {updated.Status}.", false); }
+        catch (Exception ex) { SetMessage(ex.Message, true); }
     }
 
     private async Task ConvertAsync(QuoteModel quote)
     {
         var start = quote.StartDate ?? DateOnly.FromDateTime(DateTime.Today);
         var end = quote.EndDate ?? start.AddYears(1).AddDays(-1);
-        try
-        {
-            var policy = await Insurance.ConvertToPolicyAsync(quote.Id, start, end);
-            await LoadQuotesAsync();
-            SetMessage($"Policy {policy.PolicyNumber} issued from {quote.QuoteNumber}.", false);
-        }
-        catch (Exception ex)
-        {
-            SetMessage(ex.Message, true);
-        }
+        try { var policy = await Insurance.ConvertToPolicyAsync(quote.Id, start, end); await LoadQuotesAsync(); SetMessage($"Policy {policy.PolicyNumber} issued from {quote.QuoteNumber}.", false); }
+        catch (Exception ex) { SetMessage(ex.Message, true); }
     }
 
-    private void ReplaceQuote(QuoteModel updated)
-    {
-        var index = quotes.FindIndex(q => q.Id == updated.Id);
-        if (index >= 0)
-        {
-            quotes[index] = updated;
-        }
-    }
-
-    private string CustomerName(Guid customerId) =>
-        customers.FirstOrDefault(c => c.Id == customerId)?.DisplayName ?? customerId.ToString()[..8];
-
-    private string ProductName(Guid productId) =>
-        products.FirstOrDefault(p => p.Id == productId)?.Name ?? productId.ToString()[..8];
-
-    private static string Money(string currency, decimal value) =>
-        $"{(currency == "LSL" ? "M" : currency)} {value:N2}";
-
-    private static DateOnly? ParseDate(string value) =>
-        DateOnly.TryParse(value, out var result) ? result : null;
-
+    private void ReplaceQuote(QuoteModel updated) { var index = quotes.FindIndex(q => q.Id == updated.Id); if (index >= 0) quotes[index] = updated; }
+    private string CustomerName(Guid customerId) => customers.FirstOrDefault(c => c.Id == customerId)?.DisplayName ?? customerId.ToString()[..8];
+    private string ProductName(Guid productId) => products.FirstOrDefault(p => p.Id == productId)?.Name ?? productId.ToString()[..8];
+    private static string Money(string currency, decimal value) => $"{(currency == "LSL" ? "M" : currency)} {value:N2}";
     private void ToggleComposer() => showComposer = !showComposer;
-
     private void ResetDraft() => draft = new QuoteDraft();
-
-    private void SetMessage(string value, bool isError)
-    {
-        message = value;
-        messageIsError = isError;
-    }
+    private void SetMessage(string value, bool isError) { message = value; messageIsError = isError; }
 
     private sealed class QuoteDraft
     {
@@ -381,8 +230,8 @@
         public decimal SumInsured { get; set; }
         public decimal Premium { get; set; }
         public decimal ThirdPartyLimit { get; set; }
-        public string StartDate { get; set; } = DateTime.Today.ToString("yyyy-MM-dd");
-        public string EndDate { get; set; } = DateTime.Today.AddYears(1).AddDays(-1).ToString("yyyy-MM-dd");
+        public DateTime StartDate { get; set; } = DateTime.Today;
+        public DateTime EndDate { get; set; } = DateTime.Today.AddYears(1).AddDays(-1);
         public string Notes { get; set; } = string.Empty;
     }
 }
