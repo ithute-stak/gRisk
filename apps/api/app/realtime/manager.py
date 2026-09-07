@@ -21,7 +21,7 @@ class ConnectionManager:
         for websocket in self._connections.get(channel, set()):
             try:
                 await websocket.send_json(payload)
-            except Exception:
+            except (OSError, RuntimeError):
                 dead.append(websocket)
 
         for websocket in dead:

@@ -1,5 +1,7 @@
 from fastapi import APIRouter
+from redis.exceptions import RedisError
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.redis import redis_client
 from app.db.session import AsyncSessionLocal
@@ -16,12 +18,12 @@ async def health() -> dict:
         async with AsyncSessionLocal() as session:
             await session.execute(text("SELECT 1"))
         db_ok = True
-    except Exception:
+    except SQLAlchemyError:
         db_ok = False
 
     try:
         redis_ok = bool(await redis_client.ping())
-    except Exception:
+    except RedisError:
         redis_ok = False
 
     status = "ok" if db_ok and redis_ok else "degraded"

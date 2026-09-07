@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
 from app.core.config import get_settings
 from app.core.redis import redis_client
@@ -19,7 +20,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -32,13 +33,14 @@ app.add_middleware(
 )
 
 app.include_router(health_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
 
 
 @app.get("/api/v1")
 async def root() -> dict:
     return {
         "name": settings.app_name,
-        "version": "0.1.0",
+        "version": "0.2.0",
         "environment": settings.environment,
     }
 
