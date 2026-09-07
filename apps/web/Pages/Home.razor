@@ -1,0 +1,84 @@
+@page "/"
+@inject HttpClient Http
+
+<PageTitle>Dashboard | gRisk</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Guardrisk 360</p>
+        <h1>Insurance & Risk Operations</h1>
+        <p class="lede">A single operating platform for customers, quotations, policies, claims, medical aid, guarantees, risk management and reporting.</p>
+    </div>
+    <div class="api-state @(_apiHealthy ? "healthy" : "pending")">
+        <span></span>
+        @(_statusText)
+    </div>
+</section>
+
+<section class="metric-grid">
+    <article class="metric-card">
+        <span>Customers</span>
+        <strong>—</strong>
+        <small>CRM foundation</small>
+    </article>
+    <article class="metric-card">
+        <span>Active Policies</span>
+        <strong>—</strong>
+        <small>Policy administration</small>
+    </article>
+    <article class="metric-card">
+        <span>Open Claims</span>
+        <strong>—</strong>
+        <small>Claims workflow</small>
+    </article>
+    <article class="metric-card">
+        <span>Medical Members</span>
+        <strong>—</strong>
+        <small>Health administration</small>
+    </article>
+</section>
+
+<section class="module-grid">
+    @foreach (var module in Modules)
+    {
+        <article class="module-card">
+            <div class="module-index">@module.Number</div>
+            <div>
+                <h2>@module.Title</h2>
+                <p>@module.Description</p>
+            </div>
+        </article>
+    }
+</section>
+
+@code {
+    private bool _apiHealthy;
+    private string _statusText = "Checking platform services";
+
+    private readonly Module[] Modules =
+    [
+        new("01", "CRM & Customers", "Individual, corporate and institutional customer records."),
+        new("02", "Quotations & Policies", "Insurance products, quotations, approvals, policies and renewals."),
+        new("03", "Claims", "End-to-end claims intake, assessment, insurer decisions and settlement."),
+        new("04", "Medical Aid", "Members, dependants, benefits, utilisation and health cash plan rules."),
+        new("05", "Bonds & Guarantees", "Bid, performance, advance payment and retention guarantees."),
+        new("06", "Risk Management", "Risk surveys, registers, recommendations and advisory reporting."),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var health = await Http.GetFromJsonAsync<HealthResponse>("api/v1/health");
+            _apiHealthy = health?.Status == "ok";
+            _statusText = _apiHealthy ? "Platform services online" : "Platform services degraded";
+        }
+        catch
+        {
+            _statusText = "API unavailable";
+        }
+    }
+
+    private sealed record Module(string Number, string Title, string Description);
+    private sealed record HealthResponse(string Status);
+}
