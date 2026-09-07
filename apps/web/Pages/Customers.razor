@@ -1,0 +1,283 @@
+@page "/customers"
+@using System.Net
+@using gRisk.Web.Models
+@inject ApiClient Api
+@inject AuthService Auth
+@inject NavigationManager Navigation
+
+<PageTitle>Customers | gRisk</PageTitle>
+
+<section class="page-heading split-heading">
+    <div>
+        <p class="eyebrow">Customer relationship management</p>
+        <h1>Customers</h1>
+        <p class="lede">A single Guardrisk customer record for insurance, medical aid, guarantees and risk advisory services.</p>
+    </div>
+    <button class="button primary" @onclick="ToggleCreate">@(ShowCreate ? "Close" : "New customer")</button>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="alert error">@Error</div>
+}
+
+@if (ShowCreate)
+{
+    <section class="workspace-card create-customer-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">New relationship</p>
+                <h2>Create customer</h2>
+            </div>
+        </div>
+
+        <EditForm Model="NewCustomer" OnValidSubmit="CreateCustomerAsync" FormName="create-customer">
+            <div class="form-grid">
+                <label>
+                    <span>Customer type</span>
+                    <InputSelect class="input" @bind-Value="NewCustomer.CustomerType">
+                        <option value="company">Company / organisation</option>
+                        <option value="individual">Individual</option>
+                    </InputSelect>
+                </label>
+
+                @if (NewCustomer.CustomerType == "company")
+                {
+                    <label class="span-2">
+                        <span>Company / organisation name</span>
+                        <InputText class="input" @bind-Value="NewCustomer.CompanyName" />
+                    </label>
+                    <label>
+                        <span>Registration number</span>
+                        <InputText class="input" @bind-Value="NewCustomer.RegistrationNumber" />
+                    </label>
+                    <label>
+                        <span>Tax number</span>
+                        <InputText class="input" @bind-Value="NewCustomer.TaxNumber" />
+                    </label>
+                }
+                else
+                {
+                    <label>
+                        <span>First name</span>
+                        <InputText class="input" @bind-Value="NewCustomer.FirstName" />
+                    </label>
+                    <label>
+                        <span>Last name</span>
+                        <InputText class="input" @bind-Value="NewCustomer.LastName" />
+                    </label>
+                }
+
+                <label>
+                    <span>Email</span>
+                    <InputText class="input" type="email" @bind-Value="NewCustomer.Email" />
+                </label>
+                <label>
+                    <span>Phone</span>
+                    <InputText class="input" @bind-Value="NewCustomer.Phone" />
+                </label>
+                <label>
+                    <span>Status</span>
+                    <InputSelect class="input" @bind-Value="NewCustomer.Status">
+                        <option value="active">Active</option>
+                        <option value="prospect">Prospect</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="suspended">Suspended</option>
+                    </InputSelect>
+                </label>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="button secondary" @onclick="ToggleCreate">Cancel</button>
+                <button type="submit" class="button primary" disabled="@Saving">
+                    @(Saving ? "Saving…" : "Create customer")
+                </button>
+            </div>
+        </EditForm>
+    </section>
+}
+
+<section class="workspace-card">
+    <div class="customer-toolbar">
+        <div class="search-field">
+            <input class="input" placeholder="Search name, customer number, email, phone or registration…" @bind="SearchText" @bind:event="oninput" />
+            <button class="button secondary" @onclick="SearchAsync">Search</button>
+        </div>
+        <div class="record-count">@Total customer@(Total == 1 ? "" : "s")</div>
+    </div>
+
+    @if (Loading)
+    {
+        <div class="loading-state">Loading customer records…</div>
+    }
+    else if (Customers.Count == 0)
+    {
+        <div class="empty-state compact">
+            <p class="eyebrow">CRM</p>
+            <h2>No customers found</h2>
+            <p>Create the first Guardrisk customer or change your search.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Customer</th>
+                        <th>Type</th>
+                        <th>Contact</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var customer in Customers)
+                    {
+                        <tr>
+                            <td>
+                                <div class="customer-cell">
+                                    <strong>@customer.DisplayName</strong>
+                                    <span>@customer.CustomerNumber</span>
+                                </div>
+                            </td>
+                            <td><span class="type-label">@FormatType(customer.CustomerType)</span></td>
+                            <td>
+                                <div class="contact-cell">
+                                    <span>@(customer.Email ?? "—")</span>
+                                    <small>@(customer.Phone ?? "")</small>
+                                </div>
+                            </td>
+                            <td><span class="status-pill @customer.Status">@FormatType(customer.Status)</span></td>
+                            <td>@customer.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private List<CustomerSummary> Customers { get; set; } = [];
+    private CreateCustomerRequest NewCustomer { get; set; } = new();
+    private string SearchText { get; set; } = string.Empty;
+    private string? Error { get; set; }
+    private bool Loading { get; set; } = true;
+    private bool Saving { get; set; }
+    private bool ShowCreate { get; set; }
+    private int Total { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.InitializeAsync();
+        if (!Auth.IsAuthenticated)
+        {
+            Navigation.NavigateTo("login");
+            return;
+        }
+
+        await LoadCustomersAsync();
+    }
+
+    private void ToggleCreate()
+    {
+        ShowCreate = !ShowCreate;
+        Error = null;
+        if (!ShowCreate)
+        {
+            NewCustomer = new CreateCustomerRequest();
+        }
+    }
+
+    private async Task SearchAsync() => await LoadCustomersAsync();
+
+    private async Task LoadCustomersAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            var query = string.IsNullOrWhiteSpace(SearchText)
+                ? "api/v1/customers?page=1&page_size=50"
+                : $"api/v1/customers?page=1&page_size=50&q={Uri.EscapeDataString(SearchText.Trim())}";
+
+            using var response = await Api.GetAsync(query);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                await Auth.LogoutAsync();
+                Navigation.NavigateTo("login");
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = "Customer records could not be loaded.";
+                return;
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<CustomerListResponse>();
+            Customers = payload?.Items ?? [];
+            Total = payload?.Total ?? 0;
+        }
+        catch (HttpRequestException)
+        {
+            Error = "gRisk could not reach the FastAPI service.";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task CreateCustomerAsync()
+    {
+        Error = null;
+        if (NewCustomer.CustomerType == "company" && string.IsNullOrWhiteSpace(NewCustomer.CompanyName))
+        {
+            Error = "Enter the company or organisation name.";
+            return;
+        }
+
+        if (NewCustomer.CustomerType == "individual" &&
+            string.IsNullOrWhiteSpace(NewCustomer.FirstName) &&
+            string.IsNullOrWhiteSpace(NewCustomer.LastName))
+        {
+            Error = "Enter the customer's first or last name.";
+            return;
+        }
+
+        Saving = true;
+        try
+        {
+            using var response = await Api.PostAsync("api/v1/customers", NewCustomer);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                await Auth.LogoutAsync();
+                Navigation.NavigateTo("login");
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = "The customer could not be created. Check the entered information and try again.";
+                return;
+            }
+
+            NewCustomer = new CreateCustomerRequest();
+            ShowCreate = false;
+            await LoadCustomersAsync();
+        }
+        catch (HttpRequestException)
+        {
+            Error = "gRisk could not reach the FastAPI service.";
+        }
+        finally
+        {
+            Saving = false;
+        }
+    }
+
+    private static string FormatType(string value) =>
+        string.Join(" ", value.Split('-', '_').Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
+}
