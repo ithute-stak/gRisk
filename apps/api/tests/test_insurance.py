@@ -81,13 +81,29 @@ async def test_insurance_quote_to_policy_lifecycle() -> None:
         assert quote["status"] == "draft"
         assert len(quote["items"]) == 2
 
-        status_response = await client.patch(
-            f"/api/v1/insurance/quotes/{quote['id']}/status",
+        premature_policy_response = await client.post(
+            f"/api/v1/insurance/quotes/{quote['id']}/convert-to-policy",
             headers=headers,
-            json={"status": "accepted"},
+            json={"start_date": "2026-09-10", "end_date": "2026-12-10"},
         )
-        assert status_response.status_code == 200
-        assert status_response.json()["status"] == "accepted"
+        assert premature_policy_response.status_code == 409
+
+        for quote_status in ("review", "submitted", "accepted"):
+            status_response = await client.patch(
+                f"/api/v1/insurance/quotes/{quote['id']}/status",
+                headers=headers,
+                json={"status": quote_status},
+            )
+            assert status_response.status_code == 200
+            assert status_response.json()["status"] == quote_status
+
+            if quote_status != "accepted":
+                blocked_policy_response = await client.post(
+                    f"/api/v1/insurance/quotes/{quote['id']}/convert-to-policy",
+                    headers=headers,
+                    json={"start_date": "2026-09-10", "end_date": "2026-12-10"},
+                )
+                assert blocked_policy_response.status_code == 409
 
         policy_response = await client.post(
             f"/api/v1/insurance/quotes/{quote['id']}/convert-to-policy",
@@ -99,6 +115,13 @@ async def test_insurance_quote_to_policy_lifecycle() -> None:
         assert policy["policy_number"].startswith("P-")
         assert policy["source_quote_id"] == quote["id"]
         assert policy["premium"] == "8610.00"
+
+        duplicate_policy_response = await client.post(
+            f"/api/v1/insurance/quotes/{quote['id']}/convert-to-policy",
+            headers=headers,
+            json={"start_date": "2026-09-10", "end_date": "2026-12-10"},
+        )
+        assert duplicate_policy_response.status_code == 409
 
         policies_response = await client.get(
             "/api/v1/insurance/policies",
