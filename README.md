@@ -1,38 +1,61 @@
 # gRisk
 
-gRisk is the Guardrisk integrated insurance, medical aid, claims, bonds, risk-management and customer-service platform.
+Guardrisk operating platform built with **Blazor WebAssembly + FastAPI + PostgreSQL + Redis + WebSockets**.
 
-## Target architecture
+## Architecture
 
-- **Frontend:** Blazor WebAssembly
-- **Backend:** FastAPI
-- **Database:** PostgreSQL
-- **Cache / jobs / realtime coordination:** Redis
-- **Realtime:** WebSockets
-- **Authentication:** JWT/OIDC-ready
-- **Document storage:** S3-compatible object storage
-- **Deployment:** Docker + VPS + GitHub Actions
+- `apps/web` — Blazor WebAssembly frontend
+- `apps/api` — FastAPI backend and business rules
+- PostgreSQL — system of record
+- Redis — cache, realtime/event infrastructure and background-work foundation
+- Alembic — all PostgreSQL schema migrations and controlled reference-data migrations
+- Docker Compose — local/application stack
+- GitHub Actions — backend, migration, frontend and container validation
 
-## Planned modules
+## Current delivery status
 
-1. Platform foundation, authentication, roles, audit and infrastructure
-2. CRM and customer management
-3. Quotations and policy administration
-4. Claims management
-5. Medical aid and health cash plan
-6. Bonds, guarantees and risk management
-7. Finance, notifications and customer/employer portals
-8. Reporting, integrations, hardening and production release
+### Phase 1 — Foundation
 
-## Repository layout
+Completed foundation includes authentication, roles, audit logging, PostgreSQL/Redis connectivity, Docker and CI.
 
-```text
-apps/
-  web/        # Blazor WebAssembly frontend
-  api/        # FastAPI backend
-  worker/     # background jobs
-infra/        # Docker and deployment configuration
-docs/         # architecture and product documentation
+### Phase 2 — CRM
+
+Customer management is available for individuals and companies, including contacts, addresses, notes, search and audit events.
+
+### Phase 3 — Insurance quotations and policies
+
+In active development on `feature/phase-3-insurance`:
+
+- insurance products
+- quotations and quote items
+- quote approval/status workflow
+- quote-to-policy conversion
+- policies
+- realtime quotation/policy events
+- responsive Blazor quotation and policy workspaces
+- seeded Guardrisk general-insurance products
+
+## Database migrations
+
+Alembic is mandatory for schema changes. Current migration chain:
+
+1. `20260907_0001_core_identity`
+2. `20260907_0002_crm_customers`
+3. `20260907_0003_insurance_quotes`
+4. `20260907_0004_seed_general_insurance_products`
+
+Apply migrations from `apps/api`:
+
+```bash
+python -m alembic upgrade head
 ```
 
-Development work is performed on the `development` branch and promoted to `main` after validation.
+CI also runs `alembic check` and a downgrade/upgrade smoke test to detect model drift and broken migration reversibility.
+
+## Development workflow
+
+```text
+feature/* -> development -> main
+```
+
+Feature work is merged only after the GitHub Actions checks pass.
