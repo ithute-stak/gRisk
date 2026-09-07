@@ -1,0 +1,410 @@
+@page "/claims"
+@using gRisk.Web.Models
+@inject ClaimsService Claims
+@inject InsuranceService Insurance
+
+<PageTitle>Claims | gRisk</PageTitle>
+
+<section class="page-heading claims-heading">
+    <div>
+        <p class="eyebrow">Claims operations</p>
+        <h1>Claims</h1>
+        <p class="lede">Register insured incidents, manage assessments and follow every claim from first notification to closure.</p>
+    </div>
+    <button class="primary-action" @onclick="ToggleComposer">@(showComposer ? "Close form" : "Register claim")</button>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="notice @(messageIsError ? "notice-error" : "notice-success")">@message</div>
+}
+
+<section class="claim-metrics">
+    <article><span>Open claims</span><strong>@claims.Count(c => c.Status != "closed")</strong></article>
+    <article><span>Documents pending</span><strong>@claims.Count(c => c.Status == "documents_pending")</strong></article>
+    <article><span>Claimed value</span><strong>M @claims.Sum(c => c.ClaimAmount).ToString("N2")</strong></article>
+    <article><span>Approved value</span><strong>M @claims.Sum(c => c.ApprovedAmount ?? 0).ToString("N2")</strong></article>
+</section>
+
+@if (showComposer)
+{
+    <section class="claim-card composer">
+        <div class="section-title">
+            <div>
+                <p class="eyebrow">First notification of loss</p>
+                <h2>Register claim</h2>
+            </div>
+            <span class="status-pill reported">Reported</span>
+        </div>
+
+        <div class="form-grid">
+            <label class="wide-field">
+                Policy
+                <select @bind="draft.PolicyId">
+                    <option value="@Guid.Empty">Select policy</option>
+                    @foreach (var policy in policies.Where(p => p.Status == "active" || p.Status == "expired"))
+                    {
+                        <option value="@policy.Id">@policy.PolicyNumber · @CustomerName(policy.CustomerId)</option>
+                    }
+                </select>
+            </label>
+            <label>
+                Claim type
+                <select @bind="draft.ClaimType">
+                    <option value="general">General</option>
+                    <option value="property">Property</option>
+                    <option value="motor">Motor</option>
+                    <option value="liability">Liability</option>
+                    <option value="contractors_all_risk">Contractors All Risk</option>
+                </select>
+            </label>
+            <label>
+                Priority
+                <select @bind="draft.Priority">
+                    <option value="low">Low</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                </select>
+            </label>
+            <label>Incident date<input type="date" @bind="draft.IncidentDate" /></label>
+            <label>Claim amount (M)<input type="number" min="0" step="0.01" @bind="draft.ClaimAmount" /></label>
+            <label class="wide-field">
+                Incident description
+                <textarea rows="4" @bind="draft.Description" placeholder="Describe what happened, where it happened and the damage or loss being claimed."></textarea>
+            </label>
+        </div>
+
+        <div class="form-actions">
+            <button class="secondary-action" @onclick="ResetDraft">Clear</button>
+            <button class="primary-action" disabled="@saving" @onclick="CreateClaimAsync">@(saving ? "Registering..." : "Register claim")</button>
+        </div>
+    </section>
+}
+
+<section class="claim-card">
+    <div class="toolbar">
+        <input placeholder="Search claim number or description" @bind="search" @bind:event="oninput" />
+        <select @bind="statusFilter">
+            <option value="">All statuses</option>
+            <option value="reported">Reported</option>
+            <option value="triage">Triage</option>
+            <option value="documents_pending">Documents pending</option>
+            <option value="assessment">Assessment</option>
+            <option value="insurer_review">Insurer review</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="settled">Settled</option>
+            <option value="closed">Closed</option>
+        </select>
+        <button class="secondary-action" @onclick="LoadAsync">Refresh</button>
+    </div>
+
+    @if (loading)
+    {
+        <div class="empty-state">Loading claims…</div>
+    }
+    else if (FilteredClaims.Count == 0)
+    {
+        <div class="empty-state"><strong>No claims found.</strong><span>Register a claim or change the current filters.</span></div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="claim-table">
+                <thead>
+                    <tr><th>Claim</th><th>Policy / client</th><th>Incident</th><th>Claimed</th><th>Approved</th><th>Priority</th><th>Status</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var claim in FilteredClaims)
+                    {
+                        <tr class="@(selectedClaim?.Id == claim.Id ? "selected-row" : string.Empty)">
+                            <td><strong>@claim.ClaimNumber</strong><small>@claim.ClaimType.Replace("_", " ")</small></td>
+                            <td><strong>@PolicyNumber(claim.PolicyId)</strong><small>@CustomerName(claim.CustomerId)</small></td>
+                            <td>@claim.IncidentDate.ToString("dd MMM yyyy")</td>
+                            <td>@Money(claim.ClaimAmount)</td>
+                            <td>@(claim.ApprovedAmount is decimal amount ? Money(amount) : "—")</td>
+                            <td><span class="priority-pill @claim.Priority">@claim.Priority</span></td>
+                            <td><span class="status-pill @claim.Status">@claim.Status.Replace("_", " ")</span></td>
+                            <td class="row-actions">
+                                <button @onclick="() => SelectClaim(claim)">View</button>
+                                @if (claim.Status == "reported")
+                                {
+                                    <button @onclick="() => MoveAsync(claim, "triage")">Triage</button>
+                                }
+                                else if (claim.Status == "triage" || claim.Status == "documents_pending")
+                                {
+                                    <button @onclick="() => MoveAsync(claim, "assessment")">Assess</button>
+                                }
+                                else if (claim.Status == "assessment")
+                                {
+                                    <button @onclick="() => MoveAsync(claim, "insurer_review")">Insurer review</button>
+                                    <button class="success-action" @onclick="() => ApproveAsync(claim)">Approve</button>
+                                }
+                                else if (claim.Status == "insurer_review")
+                                {
+                                    <button class="success-action" @onclick="() => ApproveAsync(claim)">Approve</button>
+                                }
+                                else if (claim.Status == "approved")
+                                {
+                                    <button class="success-action" @onclick="() => MoveAsync(claim, "settled")">Settle</button>
+                                }
+                                else if (claim.Status == "settled" || claim.Status == "rejected")
+                                {
+                                    <button @onclick="() => MoveAsync(claim, "closed")">Close</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@if (selectedClaim is not null)
+{
+    <section class="claim-card claim-detail">
+        <div class="section-title">
+            <div>
+                <p class="eyebrow">Claim timeline</p>
+                <h2>@selectedClaim.ClaimNumber</h2>
+            </div>
+            <span class="status-pill @selectedClaim.Status">@selectedClaim.Status.Replace("_", " ")</span>
+        </div>
+
+        <div class="detail-grid">
+            <div><span>Policy</span><strong>@PolicyNumber(selectedClaim.PolicyId)</strong></div>
+            <div><span>Client</span><strong>@CustomerName(selectedClaim.CustomerId)</strong></div>
+            <div><span>Claimed</span><strong>@Money(selectedClaim.ClaimAmount)</strong></div>
+            <div><span>Approved</span><strong>@(selectedClaim.ApprovedAmount is decimal approved ? Money(approved) : "Pending")</strong></div>
+        </div>
+
+        <p class="claim-description">@selectedClaim.Description</p>
+
+        <div class="quick-actions">
+            @if (selectedClaim.Status is "reported" or "triage" or "insurer_review")
+            {
+                <button class="secondary-action" @onclick="() => MoveAsync(selectedClaim, "documents_pending")">Request documents</button>
+            }
+            @if (selectedClaim.Status is "reported" or "triage" or "documents_pending" or "assessment" or "insurer_review")
+            {
+                <button class="danger-action" @onclick="() => MoveAsync(selectedClaim, "rejected")">Reject claim</button>
+            }
+        </div>
+
+        <div class="note-composer">
+            <textarea rows="2" @bind="newNote" placeholder="Add an internal claim note"></textarea>
+            <button class="secondary-action" disabled="@string.IsNullOrWhiteSpace(newNote)" @onclick="AddNoteAsync">Add note</button>
+        </div>
+
+        <div class="timeline">
+            @foreach (var evt in selectedClaim.Events.OrderByDescending(e => e.CreatedAt))
+            {
+                <article>
+                    <div class="timeline-dot"></div>
+                    <div>
+                        <strong>@EventTitle(evt)</strong>
+                        @if (!string.IsNullOrWhiteSpace(evt.Note))
+                        {
+                            <p>@evt.Note</p>
+                        }
+                        <small>@evt.CreatedAt.LocalDateTime.ToString("dd MMM yyyy HH:mm")</small>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private readonly List<ClaimModel> claims = [];
+    private readonly List<PolicyModel> policies = [];
+    private readonly List<CustomerSummary> customers = [];
+    private ClaimDraft draft = new();
+    private ClaimModel? selectedClaim;
+    private bool loading = true;
+    private bool saving;
+    private bool showComposer;
+    private string search = string.Empty;
+    private string statusFilter = string.Empty;
+    private string newNote = string.Empty;
+    private string? message;
+    private bool messageIsError;
+
+    private List<ClaimModel> FilteredClaims => claims
+        .Where(c => string.IsNullOrWhiteSpace(search)
+            || c.ClaimNumber.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || c.Description.Contains(search, StringComparison.OrdinalIgnoreCase))
+        .Where(c => string.IsNullOrWhiteSpace(statusFilter) || c.Status == statusFilter)
+        .OrderByDescending(c => c.ReportedAt)
+        .ToList();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        try
+        {
+            var claimsTask = Claims.GetClaimsAsync();
+            var policiesTask = Insurance.GetPoliciesAsync();
+            var customersTask = Insurance.GetCustomersAsync();
+            await Task.WhenAll(claimsTask, policiesTask, customersTask);
+
+            claims.Clear();
+            claims.AddRange((await claimsTask).Items);
+            policies.Clear();
+            policies.AddRange(await policiesTask);
+            customers.Clear();
+            customers.AddRange((await customersTask).Items);
+
+            if (selectedClaim is not null)
+            {
+                selectedClaim = claims.FirstOrDefault(c => c.Id == selectedClaim.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            SetMessage(ex.Message, true);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task CreateClaimAsync()
+    {
+        if (draft.PolicyId == Guid.Empty)
+        {
+            SetMessage("Select the policy against which the claim is being reported.", true);
+            return;
+        }
+        if (draft.ClaimAmount < 0 || string.IsNullOrWhiteSpace(draft.Description))
+        {
+            SetMessage("Enter a valid claim amount and incident description.", true);
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            var created = await Claims.CreateClaimAsync(new CreateClaimRequest
+            {
+                PolicyId = draft.PolicyId,
+                ClaimType = draft.ClaimType,
+                IncidentDate = DateOnly.FromDateTime(draft.IncidentDate),
+                Description = draft.Description.Trim(),
+                ClaimAmount = draft.ClaimAmount,
+                Priority = draft.Priority
+            });
+            claims.Insert(0, created);
+            selectedClaim = created;
+            ResetDraft();
+            showComposer = false;
+            SetMessage($"Claim {created.ClaimNumber} registered successfully.", false);
+        }
+        catch (Exception ex)
+        {
+            SetMessage(ex.Message, true);
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task MoveAsync(ClaimModel claim, string nextStatus)
+    {
+        try
+        {
+            var updated = await Claims.UpdateStatusAsync(
+                claim.Id,
+                nextStatus,
+                $"Claim moved from {claim.Status.Replace("_", " ")} to {nextStatus.Replace("_", " ")}.");
+            ReplaceClaim(updated);
+            SetMessage($"{updated.ClaimNumber} is now {updated.Status.Replace("_", " ")}.", false);
+        }
+        catch (Exception ex)
+        {
+            SetMessage(ex.Message, true);
+        }
+    }
+
+    private async Task ApproveAsync(ClaimModel claim)
+    {
+        try
+        {
+            var updated = await Claims.UpdateStatusAsync(
+                claim.Id,
+                "approved",
+                "Claim approved at the currently claimed amount.",
+                claim.ClaimAmount);
+            ReplaceClaim(updated);
+            SetMessage($"{updated.ClaimNumber} approved for {Money(updated.ApprovedAmount ?? 0)}.", false);
+        }
+        catch (Exception ex)
+        {
+            SetMessage(ex.Message, true);
+        }
+    }
+
+    private async Task AddNoteAsync()
+    {
+        if (selectedClaim is null || string.IsNullOrWhiteSpace(newNote))
+        {
+            return;
+        }
+
+        try
+        {
+            var evt = await Claims.AddNoteAsync(selectedClaim.Id, newNote.Trim());
+            selectedClaim.Events.Add(evt);
+            newNote = string.Empty;
+            SetMessage("Claim note added.", false);
+        }
+        catch (Exception ex)
+        {
+            SetMessage(ex.Message, true);
+        }
+    }
+
+    private void ReplaceClaim(ClaimModel updated)
+    {
+        var index = claims.FindIndex(c => c.Id == updated.Id);
+        if (index >= 0)
+        {
+            claims[index] = updated;
+        }
+        if (selectedClaim?.Id == updated.Id)
+        {
+            selectedClaim = updated;
+        }
+    }
+
+    private void SelectClaim(ClaimModel claim) => selectedClaim = claim;
+    private void ToggleComposer() => showComposer = !showComposer;
+    private void ResetDraft() => draft = new ClaimDraft();
+    private string PolicyNumber(Guid policyId) => policies.FirstOrDefault(p => p.Id == policyId)?.PolicyNumber ?? policyId.ToString()[..8];
+    private string CustomerName(Guid customerId) => customers.FirstOrDefault(c => c.Id == customerId)?.DisplayName ?? customerId.ToString()[..8];
+    private static string Money(decimal amount) => $"M {amount:N2}";
+    private static string EventTitle(ClaimEventModel evt) => evt.EventType switch
+    {
+        "claim.reported" => "Claim reported",
+        "claim.status_changed" => $"Status: {evt.ToStatus?.Replace("_", " ")}",
+        "claim.note_added" => "Internal note",
+        _ => evt.EventType.Replace("claim.", string.Empty).Replace("_", " ")
+    };
+    private void SetMessage(string value, bool isError) { message = value; messageIsError = isError; }
+
+    private sealed class ClaimDraft
+    {
+        public Guid PolicyId { get; set; }
+        public string ClaimType { get; set; } = "general";
+        public DateTime IncidentDate { get; set; } = DateTime.Today;
+        public decimal ClaimAmount { get; set; }
+        public string Priority { get; set; } = "normal";
+        public string Description { get; set; } = string.Empty;
+    }
+}
