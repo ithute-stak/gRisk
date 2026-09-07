@@ -223,10 +223,10 @@ async def convert_quote_to_policy(
     existing = await session.scalar(select(Policy).where(Policy.source_quote_id == quote.id))
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Quote already has a policy")
-    if quote.status not in {"accepted", "submitted", "review"}:
+    if quote.status != "accepted":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Quote must be accepted or under approval before conversion",
+            detail="Quote must be accepted before policy issuance",
         )
 
     policy = Policy(
