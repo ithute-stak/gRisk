@@ -46,7 +46,7 @@ jobs:
           --health-retries 10
     env:
       GRISK_ENVIRONMENT: test
-      GRISK_SECRET_KEY: ci-only-secret
+      GRISK_SECRET_KEY: ci-only-secret-key-with-at-least-32-bytes
       GRISK_DATABASE_URL: postgresql+asyncpg://grisk:grisk@127.0.0.1:5432/grisk
       GRISK_REDIS_URL: redis://127.0.0.1:6379/0
     defaults:

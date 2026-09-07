@@ -1,0 +1,94 @@
+@page "/login"
+@layout AuthLayout
+@inject AuthService Auth
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in | gRisk</PageTitle>
+
+<section class="login-card">
+    <div class="login-brand">
+        <div class="brand-mark">gR</div>
+        <div>
+            <strong>gRisk</strong>
+            <span>Guardrisk 360</span>
+        </div>
+    </div>
+
+    <p class="eyebrow">Secure staff access</p>
+    <h2>Welcome back</h2>
+    <p class="muted">Sign in with your authorised Guardrisk account.</p>
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="alert error">@Error</div>
+    }
+
+    <EditForm Model="Model" OnValidSubmit="SignInAsync" FormName="grisk-login">
+        <DataAnnotationsValidator />
+        <div class="form-stack">
+            <label>
+                <span>Email address</span>
+                <InputText class="input" @bind-Value="Model.Email" type="email" autocomplete="username" />
+            </label>
+            <label>
+                <span>Password</span>
+                <InputText class="input" @bind-Value="Model.Password" type="password" autocomplete="current-password" />
+            </label>
+            <button type="submit" class="button primary" disabled="@Busy">
+                @(Busy ? "Signing in…" : "Sign in")
+            </button>
+        </div>
+    </EditForm>
+
+    <p class="login-help">Access is controlled by Guardrisk administrators and every protected action is attributable to a user account.</p>
+</section>
+
+@code {
+    private LoginModel Model { get; } = new();
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.InitializeAsync();
+        if (Auth.IsAuthenticated)
+        {
+            Navigation.NavigateTo("");
+        }
+    }
+
+    private async Task SignInAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            var result = await Auth.LoginAsync(Model.Email, Model.Password);
+            if (result.Success)
+            {
+                Navigation.NavigateTo("");
+                return;
+            }
+
+            Error = result.Error;
+        }
+        catch (HttpRequestException)
+        {
+            Error = "gRisk could not reach the API. Confirm that the FastAPI service is running.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private sealed class LoginModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}

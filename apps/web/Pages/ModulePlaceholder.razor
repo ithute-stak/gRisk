@@ -1,4 +1,3 @@
-@page "/customers"
 @page "/quotations"
 @page "/policies"
 @page "/claims"
@@ -31,7 +30,6 @@
 @code {
     private string Title => Navigation.ToBaseRelativePath(Navigation.Uri).Trim('/').ToLowerInvariant() switch
     {
-        "customers" => "Customers",
         "quotations" => "Quotations",
         "policies" => "Policies",
         "claims" => "Claims",

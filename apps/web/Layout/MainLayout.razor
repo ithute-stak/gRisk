@@ -1,4 +1,7 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject AuthService Auth
+@inject NavigationManager Navigation
 
 <div class="app-shell">
     <aside class="sidebar">
@@ -23,6 +26,11 @@
             <NavLink href="reports">Reports</NavLink>
             <NavLink href="administration">Administration</NavLink>
         </nav>
+
+        <div class="sidebar-footer">
+            <span>@(Auth.CurrentUser?.Name ?? Auth.CurrentUser?.Email ?? "Guardrisk user")</span>
+            <button class="text-button" @onclick="SignOutAsync">Sign out</button>
+        </div>
     </aside>
 
     <main class="main-panel">
@@ -37,3 +45,28 @@
         </div>
     </main>
 </div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.SessionChanged += OnSessionChanged;
+        await Auth.InitializeAsync();
+        if (!Auth.IsAuthenticated)
+        {
+            Navigation.NavigateTo("login");
+        }
+    }
+
+    private async Task SignOutAsync()
+    {
+        await Auth.LogoutAsync();
+        Navigation.NavigateTo("login");
+    }
+
+    private void OnSessionChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Auth.SessionChanged -= OnSessionChanged;
+    }
+}

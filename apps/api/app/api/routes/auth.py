@@ -40,7 +40,17 @@ async def login(form: OAuth2Form, session: DbSession) -> TokenResponse:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return TokenResponse(access_token=create_access_token(str(user.id)))
+    roles = sorted(role.name for role in user.roles)
+    token = create_access_token(
+        str(user.id),
+        claims={
+            "email": user.email,
+            "name": user.full_name,
+            "roles": roles,
+            "is_superuser": user.is_superuser,
+        },
+    )
+    return TokenResponse(access_token=token)
 
 
 @router.get("/me", response_model=UserResponse)
