@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.JSInterop;
 
 namespace gRisk.Web.Services;
@@ -142,6 +143,7 @@ public sealed class AuthService(HttpClient httpClient, IJSRuntime jsRuntime)
 
     private sealed class TokenResponse
     {
+        [JsonPropertyName("access_token")]
         public string AccessToken { get; set; } = string.Empty;
     }
 }
