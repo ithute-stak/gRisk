@@ -4,6 +4,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.auth import router as auth_router
+from app.api.routes.claims import router as claims_router
 from app.api.routes.customers import router as customers_router
 from app.api.routes.health import router as health_router
 from app.api.routes.insurance import router as insurance_router
@@ -22,7 +23,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.4.0",
+    version="0.5.0",
     lifespan=lifespan,
 )
 
@@ -38,13 +39,14 @@ app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(customers_router, prefix="/api/v1")
 app.include_router(insurance_router, prefix="/api/v1")
+app.include_router(claims_router, prefix="/api/v1")
 
 
 @app.get("/api/v1")
 async def root() -> dict:
     return {
         "name": settings.app_name,
-        "version": "0.4.0",
+        "version": "0.5.0",
         "environment": settings.environment,
     }
 
