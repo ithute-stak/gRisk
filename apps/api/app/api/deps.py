@@ -1,4 +1,5 @@
 import uuid
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -12,11 +13,11 @@ from app.models.identity import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
+DbSession = Annotated[AsyncSession, Depends(get_db)]
+AccessToken = Annotated[str, Depends(oauth2_scheme)]
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    session: AsyncSession = Depends(get_db),
-) -> User:
+
+async def get_current_user(token: AccessToken, session: DbSession) -> User:
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -37,7 +38,16 @@ async def get_current_user(
     return user
 
 
-async def require_superuser(user: User = Depends(get_current_user)) -> User:
+CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def require_superuser(user: CurrentUser) -> User:
     if not user.is_superuser:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superuser access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Superuser access required",
+        )
     return user
+
+
+SuperUser = Annotated[User, Depends(require_superuser)]
