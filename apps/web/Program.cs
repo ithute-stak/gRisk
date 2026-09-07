@@ -11,5 +11,6 @@ var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:8000/"
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ApiClient>();
+builder.Services.AddScoped<InsuranceService>();
 
 await builder.Build().RunAsync();
