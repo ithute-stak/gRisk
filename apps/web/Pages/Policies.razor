@@ -1,0 +1,169 @@
+@page "/policies"
+@using gRisk.Web.Models
+@inject InsuranceService Insurance
+
+<PageTitle>Policies | gRisk</PageTitle>
+
+<section class="page-heading policy-heading">
+    <div>
+        <p class="eyebrow">Insurance operations</p>
+        <h1>Policies</h1>
+        <p class="lede">Track issued cover, policy periods, premium values and source quotations.</p>
+    </div>
+    <button class="secondary-action" @onclick="LoadAsync">Refresh</button>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="notice notice-error">@message</div>
+}
+
+<section class="policy-metrics">
+    <article>
+        <span>Active policies</span>
+        <strong>@policies.Count(p => p.Status == "active")</strong>
+    </article>
+    <article>
+        <span>Total policies</span>
+        <strong>@policies.Count</strong>
+    </article>
+    <article>
+        <span>Annualised premium view</span>
+        <strong>M @policies.Where(p => p.Currency == "LSL").Sum(p => p.Premium).ToString("N2")</strong>
+    </article>
+    <article>
+        <span>Expiring in 30 days</span>
+        <strong>@ExpiringSoonCount</strong>
+    </article>
+</section>
+
+<section class="policy-card">
+    <div class="toolbar">
+        <input placeholder="Search policy number" @bind="search" @bind:event="oninput" />
+        <select @bind="statusFilter">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="suspended">Suspended</option>
+            <option value="expired">Expired</option>
+            <option value="cancelled">Cancelled</option>
+        </select>
+    </div>
+
+    @if (loading)
+    {
+        <div class="empty-state">Loading policies…</div>
+    }
+    else if (FilteredPolicies.Count == 0)
+    {
+        <div class="empty-state">
+            <strong>No policies found.</strong>
+            <span>Accepted quotations can be converted into policies from the Quotations workspace.</span>
+        </div>
+    }
+    else
+    {
+        <div class="policy-grid">
+            @foreach (var policy in FilteredPolicies)
+            {
+                <article class="policy-item">
+                    <div class="policy-topline">
+                        <div>
+                            <span class="policy-number">@policy.PolicyNumber</span>
+                            <h2>@ProductName(policy.ProductId)</h2>
+                        </div>
+                        <span class="status-pill @policy.Status">@policy.Status</span>
+                    </div>
+
+                    <dl>
+                        <div>
+                            <dt>Customer</dt>
+                            <dd>@CustomerName(policy.CustomerId)</dd>
+                        </div>
+                        <div>
+                            <dt>Sum insured</dt>
+                            <dd>@Money(policy.Currency, policy.SumInsured)</dd>
+                        </div>
+                        <div>
+                            <dt>Premium</dt>
+                            <dd>@Money(policy.Currency, policy.Premium)</dd>
+                        </div>
+                        <div>
+                            <dt>Cover period</dt>
+                            <dd>@policy.StartDate.ToString("dd MMM yyyy") – @policy.EndDate.ToString("dd MMM yyyy")</dd>
+                        </div>
+                    </dl>
+
+                    <div class="policy-footer">
+                        <span>@DaysRemaining(policy) days remaining</span>
+                        @if (policy.SourceQuoteId is Guid source)
+                        {
+                            <span>Source quote: @source.ToString()[..8]</span>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private readonly List<PolicyModel> policies = [];
+    private readonly List<CustomerSummary> customers = [];
+    private readonly List<InsuranceProductModel> products = [];
+    private bool loading = true;
+    private string search = string.Empty;
+    private string statusFilter = string.Empty;
+    private string? message;
+
+    private List<PolicyModel> FilteredPolicies => policies
+        .Where(p => string.IsNullOrWhiteSpace(search) || p.PolicyNumber.Contains(search, StringComparison.OrdinalIgnoreCase))
+        .Where(p => string.IsNullOrWhiteSpace(statusFilter) || p.Status == statusFilter)
+        .OrderByDescending(p => p.CreatedAt)
+        .ToList();
+
+    private int ExpiringSoonCount => policies.Count(p =>
+        p.Status == "active" && DaysRemaining(p) is >= 0 and <= 30);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        message = null;
+        try
+        {
+            var policyTask = Insurance.GetPoliciesAsync();
+            var productTask = Insurance.GetProductsAsync();
+            var customerTask = Insurance.GetCustomersAsync();
+            await Task.WhenAll(policyTask, productTask, customerTask);
+
+            policies.Clear();
+            policies.AddRange(await policyTask);
+            products.Clear();
+            products.AddRange(await productTask);
+            customers.Clear();
+            customers.AddRange((await customerTask).Items);
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private string CustomerName(Guid customerId) =>
+        customers.FirstOrDefault(c => c.Id == customerId)?.DisplayName ?? customerId.ToString()[..8];
+
+    private string ProductName(Guid productId) =>
+        products.FirstOrDefault(p => p.Id == productId)?.Name ?? "Insurance policy";
+
+    private static string Money(string currency, decimal value) =>
+        $"{(currency == "LSL" ? "M" : currency)} {value:N2}";
+
+    private static int DaysRemaining(PolicyModel policy) =>
+        policy.EndDate.DayNumber - DateOnly.FromDateTime(DateTime.Today).DayNumber;
+}
