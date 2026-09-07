@@ -1,16 +1,17 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_current_user
+from app.api.deps import CurrentUser, DbSession
 from app.core.security import create_access_token, verify_password
-from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.auth import TokenResponse, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
+OAuth2Form = Annotated[OAuth2PasswordRequestForm, Depends()]
 
 
 def _to_user_response(user: User) -> UserResponse:
@@ -25,10 +26,7 @@ def _to_user_response(user: User) -> UserResponse:
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(
-    form: OAuth2PasswordRequestForm = Depends(),
-    session: AsyncSession = Depends(get_db),
-) -> TokenResponse:
+async def login(form: OAuth2Form, session: DbSession) -> TokenResponse:
     email = form.username.strip().lower()
     result = await session.execute(
         select(User).options(selectinload(User.roles)).where(func.lower(User.email) == email)
@@ -46,5 +44,5 @@ async def login(
 
 
 @router.get("/me", response_model=UserResponse)
-async def me(user: User = Depends(get_current_user)) -> UserResponse:
+async def me(user: CurrentUser) -> UserResponse:
     return _to_user_response(user)
