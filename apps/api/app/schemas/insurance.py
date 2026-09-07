@@ -28,7 +28,7 @@ class ProductResponse(ProductCreate):
 class QuoteItemCreate(BaseModel):
     label: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=5000)
-    amount: Decimal = Field(default=Decimal("0"), ge=0)
+    amount: Decimal = Field(default=Decimal(0), ge=0)
 
 
 class QuoteItemResponse(QuoteItemCreate):
@@ -42,8 +42,8 @@ class QuoteCreate(BaseModel):
     customer_id: uuid.UUID
     product_id: uuid.UUID
     currency: str = Field(default="LSL", min_length=3, max_length=3)
-    sum_insured: Decimal = Field(default=Decimal("0"), ge=0)
-    premium: Decimal = Field(default=Decimal("0"), ge=0)
+    sum_insured: Decimal = Field(default=Decimal(0), ge=0)
+    premium: Decimal = Field(default=Decimal(0), ge=0)
     third_party_limit: Decimal | None = Field(default=None, ge=0)
     start_date: date | None = None
     end_date: date | None = None
