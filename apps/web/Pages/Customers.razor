@@ -110,7 +110,7 @@
     {
         <div class="loading-state">Loading customer records…</div>
     }
-    else if (Customers.Count == 0)
+    else if (CustomerRows.Count == 0)
     {
         <div class="empty-state compact">
             <p class="eyebrow">CRM</p>
@@ -132,7 +132,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var customer in Customers)
+                    @foreach (var customer in CustomerRows)
                     {
                         <tr>
                             <td>
@@ -159,7 +159,7 @@
 </section>
 
 @code {
-    private List<CustomerSummary> Customers { get; set; } = [];
+    private List<CustomerSummary> CustomerRows { get; set; } = [];
     private CreateCustomerRequest NewCustomer { get; set; } = new();
     private string SearchText { get; set; } = string.Empty;
     private string? Error { get; set; }
@@ -217,7 +217,7 @@
             }
 
             var payload = await response.Content.ReadFromJsonAsync<CustomerListResponse>();
-            Customers = payload?.Items ?? [];
+            CustomerRows = payload?.Items ?? [];
             Total = payload?.Total ?? 0;
         }
         catch (HttpRequestException)
