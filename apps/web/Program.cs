@@ -12,5 +12,6 @@ builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(apiBaseUr
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ApiClient>();
 builder.Services.AddScoped<InsuranceService>();
+builder.Services.AddScoped<ClaimsService>();
 
 await builder.Build().RunAsync();
