@@ -2,7 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession
@@ -160,7 +160,11 @@ async def create_quote(
     created = await _get_quote_or_404(session, quote.id)
     await manager.broadcast(
         "quotations",
-        {"channel": "quotations", "event": "quote.created", "data": {"id": str(created.id), "quote_number": created.quote_number}},
+        {
+            "channel": "quotations",
+            "event": "quote.created",
+            "data": {"id": str(created.id), "quote_number": created.quote_number},
+        },
     )
     return created
 
@@ -194,7 +198,11 @@ async def update_quote_status(
     updated = await _get_quote_or_404(session, quote.id)
     await manager.broadcast(
         "quotations",
-        {"channel": "quotations", "event": "quote.status_changed", "data": {"id": str(updated.id), "status": updated.status}},
+        {
+            "channel": "quotations",
+            "event": "quote.status_changed",
+            "data": {"id": str(updated.id), "status": updated.status},
+        },
     )
     return updated
 
@@ -248,7 +256,11 @@ async def convert_quote_to_policy(
     await session.refresh(policy)
     await manager.broadcast(
         "policies",
-        {"channel": "policies", "event": "policy.created", "data": {"id": str(policy.id), "policy_number": policy.policy_number}},
+        {
+            "channel": "policies",
+            "event": "policy.created",
+            "data": {"id": str(policy.id), "policy_number": policy.policy_number},
+        },
     )
     return policy
 
