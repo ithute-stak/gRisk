@@ -45,6 +45,7 @@ Current migration chain:
 2. `20260907_0002_crm_customers`
 3. `20260907_0003_insurance_quotes`
 4. `20260907_0004_seed_general_insurance_products`
+5. `20260907_0005_align_unique_indexes`
 
 Apply migrations from `apps/api`:
 
