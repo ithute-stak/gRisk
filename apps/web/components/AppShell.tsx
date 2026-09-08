@@ -77,7 +77,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="sidebar-foot">
-            <span>gRisk 0.8</span>
+            <span>gRisk 0.9</span>
             <small>{staff ? "Next.js + FastAPI" : "Secure customer access"}</small>
           </div>
         </aside>
