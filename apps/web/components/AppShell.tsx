@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { clearToken, currentUser } from "@/lib/auth";
 import Protected from "@/components/Protected";
+import { clearToken, currentUser } from "@/lib/auth";
+import type { AuthUser } from "@/lib/types";
 
-const navigation = [
+const staffRoleNames = new Set(["superadmin", "admin", "broker", "claims", "medical", "finance", "risk", "viewer"]);
+
+const staffNavigation = [
   ["/", "Dashboard", "DB"],
   ["/customers", "Customers", "CU"],
   ["/quotations", "Quotations", "QT"],
@@ -15,21 +18,36 @@ const navigation = [
   ["/medical", "Medical Aid", "MD"],
   ["/bonds", "Bonds & Guarantees", "BG"],
   ["/risk", "Risk Management", "RK"],
-  ["/reports", "Reports", "RP"],
   ["/finance", "Finance", "FN"],
+  ["/notifications", "Notifications", "NT"],
+  ["/portal", "Customer Portal", "PT"],
+  ["/reports", "Reports", "RP"],
   ["/admin", "Administration", "AD"],
 ] as const;
+
+const portalNavigation = [
+  ["/portal", "My Cover", "MC"],
+  ["/notifications", "Notifications", "NT"],
+] as const;
+
+function isStaffUser(user: AuthUser | null): boolean {
+  if (!user) return false;
+  return user.isSuperuser || user.roles.some((role) => staffRoleNames.has(role));
+}
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [userName, setUserName] = useState("gRisk user");
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
-    const user = currentUser();
-    setUserName(user?.name || user?.email || "gRisk user");
+    setUser(currentUser());
   }, [pathname]);
+
+  const staff = isStaffUser(user);
+  const navigation = staff ? staffNavigation : portalNavigation;
+  const userName = user?.name || user?.email || "gRisk user";
 
   function signOut() {
     clearToken();
@@ -44,7 +62,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="brand-mark">gR</div>
             <div>
               <strong>gRisk</strong>
-              <span>Guardrisk Platform</span>
+              <span>{staff ? "Guardrisk Platform" : "Customer Portal"}</span>
             </div>
           </div>
           <nav className="side-nav" aria-label="Main navigation">
@@ -59,8 +77,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="sidebar-foot">
-            <span>gRisk 0.7</span>
-            <small>Next.js + FastAPI</small>
+            <span>gRisk 0.8</span>
+            <small>{staff ? "Next.js + FastAPI" : "Secure customer access"}</small>
           </div>
         </aside>
 
@@ -70,7 +88,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <header className="topbar">
             <button className="menu-button" onClick={() => setOpen((value) => !value)} aria-label="Open navigation">☰</button>
             <div className="topbar-context">
-              <strong>Guardrisk Operations</strong>
+              <strong>{staff ? "Guardrisk Operations" : "Guardrisk Customer Portal"}</strong>
               <span>Lesotho</span>
             </div>
             <div className="topbar-user">
