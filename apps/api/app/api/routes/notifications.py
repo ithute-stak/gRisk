@@ -116,4 +116,4 @@ async def mark_all_read(user: CurrentUser, session: DbSession):
         notification.status = "read"
         notification.read_at = now
     await session.commit()
-    return await list_notifications(user, session)
+    return await list_notifications(user, session, None, None, None)
