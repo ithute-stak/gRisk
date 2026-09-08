@@ -12,7 +12,10 @@ async def test_root_and_health_endpoints() -> None:
         assert root_response.status_code == 200
         root_payload = root_response.json()
         assert root_payload["name"] == "gRisk API"
-        assert root_payload["version"] == "0.8.0"
+        assert root_payload["version"] == "0.9.0"
+        assert root_response.headers["x-content-type-options"] == "nosniff"
+        assert root_response.headers["x-frame-options"] == "DENY"
+        assert root_response.headers["cache-control"] == "no-store"
 
         health_response = await client.get("/api/v1/health")
         assert health_response.status_code == 200
@@ -23,3 +26,11 @@ async def test_root_and_health_endpoints() -> None:
             "postgres": True,
             "redis": True,
         }
+
+        live_response = await client.get("/api/v1/health/live")
+        assert live_response.status_code == 200
+        assert live_response.json() == {"status": "ok", "service": "api"}
+
+        ready_response = await client.get("/api/v1/health/ready")
+        assert ready_response.status_code == 200
+        assert ready_response.json()["status"] == "ok"
