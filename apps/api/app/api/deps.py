@@ -31,6 +31,23 @@ PORTAL_SAFE_PREFIXES = (
     "/api/v1/portal",
     "/api/v1/notifications",
 )
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+WRITE_ROLE_BY_PREFIX: tuple[tuple[str, set[str]], ...] = (
+    ("/api/v1/customers", {"admin", "broker"}),
+    ("/api/v1/insurance", {"admin", "broker"}),
+    ("/api/v1/claims", {"admin", "broker", "claims"}),
+    ("/api/v1/medical", {"admin", "medical"}),
+    ("/api/v1/guarantees", {"admin", "broker", "risk"}),
+    ("/api/v1/risk", {"admin", "risk"}),
+    ("/api/v1/finance", {"admin", "finance"}),
+)
+
+
+def _can_write_operational_path(path: str, role_names: set[str]) -> bool:
+    for prefix, required_roles in WRITE_ROLE_BY_PREFIX:
+        if path.startswith(prefix):
+            return bool(role_names & required_roles)
+    return True
 
 
 async def get_current_user(token: AccessToken, session: DbSession, request: Request) -> User:
@@ -54,11 +71,29 @@ async def get_current_user(token: AccessToken, session: DbSession, request: Requ
 
     role_names = {role.name for role in user.roles}
     is_staff = user.is_superuser or bool(role_names & STAFF_ROLE_NAMES)
-    if not is_staff and not request.url.path.startswith(PORTAL_SAFE_PREFIXES):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Customer portal accounts cannot access internal operational APIs",
-        )
+    if not is_staff:
+        if not request.url.path.startswith(PORTAL_SAFE_PREFIXES):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Customer portal accounts cannot access internal operational APIs",
+            )
+        return user
+
+    if user.is_superuser:
+        return user
+
+    if request.method not in SAFE_METHODS:
+        if role_names == {"viewer"}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Viewer accounts have read-only access",
+            )
+        if not _can_write_operational_path(request.url.path, role_names):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your role does not permit this operational change",
+            )
+
     return user
 
 
