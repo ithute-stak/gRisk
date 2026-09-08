@@ -2,7 +2,16 @@ import uuid
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse
 from sqlalchemy import func, or_, select
 
@@ -11,7 +20,11 @@ from app.models.customer import Customer
 from app.models.document import Document
 from app.schemas.document import DocumentListResponse, DocumentResponse
 from app.services.audit import record_audit_event
-from app.services.document_storage import DocumentTooLargeError, document_path, save_upload
+from app.services.document_storage import (
+    DocumentTooLargeError,
+    document_path,
+    save_upload,
+)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 Page = Annotated[int, Query(ge=1)]
