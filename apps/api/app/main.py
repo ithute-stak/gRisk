@@ -1,8 +1,12 @@
+import logging
+import uuid
 from contextlib import asynccontextmanager
+from time import perf_counter
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.claims import router as claims_router
 from app.api.routes.customers import router as customers_router
@@ -20,6 +24,7 @@ from app.core.redis import redis_client
 from app.realtime.manager import manager
 
 settings = get_settings()
+request_logger = logging.getLogger("grisk.request")
 
 
 @asynccontextmanager
@@ -30,7 +35,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.9.0",
+    version="1.0.0",
     lifespan=lifespan,
     docs_url=None if settings.environment == "production" else "/docs",
     redoc_url=None if settings.environment == "production" else "/redoc",
@@ -46,8 +51,22 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def security_headers(request: Request, call_next):
-    response = await call_next(request)
+async def operational_middleware(request: Request, call_next):
+    request_id = uuid.uuid4().hex
+    started = perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        request_logger.exception(
+            "request_failed request_id=%s method=%s path=%s",
+            request_id,
+            request.method,
+            request.url.path,
+        )
+        raise
+
+    duration_ms = (perf_counter() - started) * 1000
+    response.headers["X-Request-ID"] = request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -55,6 +74,14 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
+    request_logger.info(
+        "request_completed request_id=%s method=%s path=%s status=%s duration_ms=%.2f",
+        request_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+    )
     return response
 
 
@@ -70,13 +97,14 @@ app.include_router(finance_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(portal_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
+app.include_router(admin_router, prefix="/api/v1")
 
 
 @app.get("/api/v1")
 async def root() -> dict:
     return {
         "name": settings.app_name,
-        "version": "0.9.0",
+        "version": "1.0.0",
         "environment": settings.environment,
     }
 
