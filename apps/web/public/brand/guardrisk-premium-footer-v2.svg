@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="22mm" viewBox="0 0 210 22">
+  <rect width="210" height="22" fill="#F7F8F9"/>
+  <rect width="210" height="1.25" fill="#F47A20"/>
+  <text x="18" y="10" fill="#30343B" font-family="Arial,Helvetica,sans-serif" font-size="2.7" font-weight="700">GUARDRISK INSURANCE BROKERS</text>
+  <text x="18" y="15.3" fill="#6B7280" font-family="Arial,Helvetica,sans-serif" font-size="2.35">LNDC Centre, Ground Floor Kingsway, Maseru 100 | (+266) 2232 2537 / 5939 5332 / 6272 0488</text>
+  <text x="187" y="10" text-anchor="end" fill="#6B7280" font-family="Arial,Helvetica,sans-serif" font-size="2.35">info@guardrisk.co.ls | IBR No. 69915</text>
+  <circle cx="199" cy="15.2" r="3.5" fill="#F47A20"/>
+  <text x="199" y="16.3" text-anchor="middle" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="2.6" font-weight="700">G</text>
+</svg>
