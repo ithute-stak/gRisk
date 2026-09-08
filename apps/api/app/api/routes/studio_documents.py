@@ -11,12 +11,8 @@ from app.api.deps import CurrentUser, DbSession
 from app.models.identity import User
 from app.models.studio import StudioCollaborator, StudioDocument, StudioRevision
 from app.services.audit import record_audit_event
-from app.services.studio_export import (
-    export_docx,
-    export_pdf,
-    plain_text_from_html,
-    sanitize_document_html,
-)
+from app.services.studio_export import plain_text_from_html, sanitize_document_html
+from app.services.studio_letterhead import export_docx, export_pdf
 
 router = APIRouter(prefix="/document-studio/documents", tags=["document-studio"])
 
