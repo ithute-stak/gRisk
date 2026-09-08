@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { getToken, saveToken } from "@/lib/auth";
+import { refreshCurrentUser, saveUser } from "@/lib/auth";
 import { login } from "@/lib/api";
 
 export default function LoginPage() {
@@ -13,7 +13,17 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (getToken()) router.replace("/");
+    let active = true;
+    void refreshCurrentUser()
+      .then((user) => {
+        if (active && user) router.replace("/");
+      })
+      .catch(() => {
+        // Login remains available when the current-session check cannot complete.
+      });
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   async function submit(event: FormEvent) {
@@ -21,8 +31,8 @@ export default function LoginPage() {
     setError("");
     setBusy(true);
     try {
-      const result = await login(email, password);
-      saveToken(result.access_token);
+      const user = await login(email, password);
+      saveUser(user);
       router.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in.");
