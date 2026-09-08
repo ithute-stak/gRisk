@@ -95,7 +95,10 @@ export async function apiDownload(path: string): Promise<{ blob: Blob; filename:
 export async function login(email: string, password: string): Promise<AuthUser> {
   const response = await fetch("/api/session/login", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-gRisk-Request": "1",
+    },
     body: JSON.stringify({ email: email.trim(), password }),
     cache: "no-store",
   });
@@ -107,7 +110,11 @@ export async function login(email: string, password: string): Promise<AuthUser> 
 
 export async function logout(): Promise<void> {
   try {
-    await fetch("/api/session/logout", { method: "POST", cache: "no-store" });
+    await fetch("/api/session/logout", {
+      method: "POST",
+      headers: { "X-gRisk-Request": "1" },
+      cache: "no-store",
+    });
   } finally {
     clearUser();
   }
