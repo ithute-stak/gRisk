@@ -6,8 +6,15 @@ export type StudioSettings = {
   page_size?: "a4" | "letter";
   orientation?: "portrait" | "landscape";
   margin_mm?: number;
+  margin_top_mm?: number;
+  margin_right_mm?: number;
+  margin_bottom_mm?: number;
+  margin_left_mm?: number;
   theme?: string;
   brand_header?: boolean;
+  default_font_family?: string;
+  default_font_size_pt?: number;
+  default_line_height_percent?: number;
 };
 
 export type StudioDocument = {
@@ -18,6 +25,7 @@ export type StudioDocument = {
   style_key: string;
   status: "draft" | "review" | "final" | "archived";
   visibility: "private" | "team";
+  content_json: Record<string, unknown>;
   html_content: string;
   plain_text: string;
   settings: StudioSettings;
@@ -31,6 +39,7 @@ export type StudioRevision = {
   id: string;
   version: number;
   title: string;
+  content_json: Record<string, unknown>;
   html_content: string;
   plain_text: string;
   settings: StudioSettings;
@@ -56,6 +65,7 @@ export function createStudioDocument(payload: {
   title: string;
   template_key: string;
   style_key: string;
+  content_json?: Record<string, unknown>;
   html_content: string;
   plain_text: string;
   settings: StudioSettings;
@@ -102,7 +112,7 @@ export function removeStudioCollaborator(id: string, userId: string) {
   return apiRequest<void>(`/api/v1/document-studio/documents/${id}/collaborators/${userId}`, { method: "DELETE" });
 }
 
-export function downloadStudioDocument(id: string, format: "pdf" | "word") {
+export function downloadStudioDocument(id: string, format: "pdf" | "docx") {
   return apiDownload(`/api/v1/document-studio/documents/${id}/export/${format}`);
 }
 
