@@ -4,9 +4,9 @@ gRisk is the Guardrisk operating platform built with **Next.js + FastAPI + Postg
 
 ## Release status
 
-The current release line is **gRisk 1.0**. The core Guardrisk operating modules are implemented:
+The current release line is **gRisk 1.0**. The Guardrisk operating scope implemented in the repository includes:
 
-- authentication, staff roles and audit logging
+- secure authentication, staff roles and audit logging
 - CRM and customer management
 - insurance products, quotations and policies
 - general insurance claims
@@ -15,44 +15,55 @@ The current release line is **gRisk 1.0**. The core Guardrisk operating modules 
 - bonds and guarantees
 - enterprise risk assessments and risk registers
 - finance, invoices and payments
+- document management with durable storage
+- strategic partner/integration registry
 - notifications and customer portal access
 - management reporting
 - superuser administration
 - operational health, request IDs and structured request logging
 
-Provider-specific insurer, bank/payment, SMS, WhatsApp, email and medical-provider integrations are intentionally not hard-coded. They require confirmed provider APIs and credentials.
+Provider-specific insurer, bank/payment, SMS, WhatsApp, email and medical-provider integrations are intentionally not fabricated. They are activated only after Guardrisk supplies confirmed provider APIs, credentials and reconciliation rules.
 
 ## Architecture
 
 ```text
 Browser
   |
+  | HTTPS + HttpOnly session cookie
   v
-Next.js 16 / React
-  |  /api/proxy/*
+Next.js 16 / React BFF
+  |  server-side bearer token
   v
 FastAPI 1.0 application
   |-------------------|
   v                   v
 PostgreSQL           Redis
 (system of record)   cache/rate-limit/realtime foundation
+  |
+  v
+Durable document volume
 ```
 
 Repository layout:
 
 ```text
-apps/web        Next.js frontend
-apps/api        FastAPI backend, Alembic migrations and tests
+apps/web                 Next.js frontend/BFF
+apps/api                 FastAPI backend, Alembic migrations and tests
 docker-compose.yml       local/development stack
-docker-compose.prod.yml  production-oriented stack
+docker-compose.prod.yml  production stack
+DEPLOYMENT.md            production runbook
+Caddyfile.example        same-origin HTTPS/WebSocket routing example
 ```
 
-The browser does not connect directly to PostgreSQL or Redis. Business rules remain in FastAPI.
+The browser never receives PostgreSQL/Redis credentials and no FastAPI bearer token is stored in browser `localStorage` or `sessionStorage`. Business rules remain in FastAPI.
 
 ## Security model
 
 - passwords are hashed with the configured `pwdlib` Argon2 implementation
 - JWT access tokens are issuer/audience validated
+- browser authentication uses an HttpOnly, SameSite=Strict cookie through the Next.js BFF
+- production cookies are `Secure` and require HTTPS
+- browser mutation requests use a BFF request marker in addition to SameSite cookie protection
 - inactive users are rejected on authenticated API requests
 - portal-only users cannot access internal operational APIs
 - viewer accounts are read-only
@@ -61,7 +72,9 @@ The browser does not connect directly to PostgreSQL or Redis. Business rules rem
 - login attempts are rate-limited through Redis
 - production rejects weak JWT secrets, default database credentials, wildcard CORS and non-HTTPS CORS origins
 - API responses receive no-store/security headers and request IDs
-- WebSocket channels require authentication; customer accounts can only subscribe to their own notification channel
+- Next.js applies defensive browser security headers
+- production WebSocket channels authenticate from the HttpOnly cookie and enforce allowed origins
+- customer accounts can only subscribe to their own notification channel
 - client WebSocket messages are not rebroadcast into operational channels
 
 Core staff roles seeded by Alembic are `superadmin`, `admin`, `broker`, `claims`, `medical`, `finance`, `risk` and `viewer`.
@@ -83,6 +96,7 @@ Current migration chain:
 9. `20260908_0009_align_medical_unique_indexes.py`
 10. `20260908_0010_bonds_risk.py`
 11. `20260908_0011_finance_notifications_portal.py`
+12. `20260908_0012_documents_partners.py`
 
 From `apps/api`:
 
@@ -113,7 +127,7 @@ Docker Compose runs an explicit one-shot `migrate` service before FastAPI starts
 
 ## Bootstrap the first administrator
 
-After migrations are applied, set strong temporary bootstrap credentials in your environment and run:
+After migrations are applied, set strong temporary bootstrap credentials and run:
 
 ```bash
 docker compose run --rm \
@@ -122,20 +136,25 @@ docker compose run --rm \
   api python -m app.scripts.bootstrap_admin
 ```
 
-The command creates the account only when it does not already exist. Remove bootstrap credentials from the environment after first provisioning.
+The command creates the account only when it does not already exist. Remove bootstrap credentials after first provisioning.
 
 ## Production deployment
 
-Use the production Compose file as the baseline:
+Start from the production environment template:
 
 ```bash
+cp .env.production.example .env.production
+# replace every CHANGE_ME value
+
 docker compose -f docker-compose.prod.yml --env-file .env.production config
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 ```
 
-Production requires explicit PostgreSQL credentials, `GRISK_DATABASE_URL`, a strong `GRISK_SECRET_KEY` and HTTPS CORS origins. PostgreSQL and Redis are not published to host ports by the production Compose file.
+The production stack binds Next.js and FastAPI only to host loopback. Put an HTTPS reverse proxy in front of them; `Caddyfile.example` shows the required same-origin routing for normal traffic and `/ws/*`.
 
-See `DEPLOYMENT.md` for the deployment, backup, health-check and rollback checklist.
+PostgreSQL and Redis are not published to host ports. The document volume is durable and must be included in backups together with PostgreSQL.
+
+See `DEPLOYMENT.md` for deployment, TLS, backup, restore, health-check and rollback procedures.
 
 ## GitHub Actions
 
@@ -143,10 +162,10 @@ Hosted CI is deliberately conservative to reduce Actions consumption:
 
 - backend CI is path-filtered
 - Next.js CI is path-filtered
-- full Docker image validation is manual
+- full Docker image/smoke validation is normally manual
 - superseded runs are cancelled through workflow concurrency
 
-Before merging a release candidate, run the relevant backend and frontend gates and the manual container validation once.
+A release candidate is promoted only after backend, frontend and full-stack container validation succeed.
 
 ## Development workflow
 
