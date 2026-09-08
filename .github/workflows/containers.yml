@@ -12,12 +12,42 @@ concurrency:
 
 jobs:
   containers:
-    name: Compose + Docker build
+    name: Compose + Docker smoke test
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_DB: grisk
+      POSTGRES_USER: grisk_ci
+      POSTGRES_PASSWORD: grisk-ci-database-password
+      GRISK_ENVIRONMENT: development
+      GRISK_SECRET_KEY: ci-only-secret-key-with-at-least-32-bytes
+      GRISK_DATABASE_URL: postgresql+asyncpg://grisk_ci:grisk-ci-database-password@postgres:5432/grisk
+      GRISK_REDIS_URL: redis://redis:6379/0
+      GRISK_CORS_ORIGINS: http://localhost:8080
+      GRISK_WEB_PORT: 8080
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      - name: Validate Compose file
+      - name: Validate development Compose
         run: docker compose config
-      - name: Build application images
-        run: docker compose build api web
+      - name: Validate production Compose
+        env:
+          GRISK_CORS_ORIGINS: https://grisk.example.test
+        run: docker compose -f docker-compose.prod.yml config
+      - name: Build and start stack
+        run: docker compose up -d --build
+      - name: Wait for application health
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/api/v1/health/ready >/dev/null \
+              && curl --fail --silent http://127.0.0.1:8080/api/health >/dev/null; then
+              docker compose ps
+              exit 0
+            fi
+            sleep 3
+          done
+          docker compose ps
+          docker compose logs api web migrate
+          exit 1
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v --remove-orphans
