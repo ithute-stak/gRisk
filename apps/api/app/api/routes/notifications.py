@@ -8,7 +8,11 @@ from app.api.deps import CurrentUser, DbSession, SuperUser
 from app.models.identity import User
 from app.models.notification import Notification
 from app.realtime.manager import manager
-from app.schemas.notification import NotificationCreate, NotificationListResponse, NotificationResponse
+from app.schemas.notification import (
+    NotificationCreate,
+    NotificationListResponse,
+    NotificationResponse,
+)
 from app.services.notifications import notify_user
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
