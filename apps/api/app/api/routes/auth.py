@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import get_settings
-from app.core.redis import redis_client
+from app.core.redis import redis_connection
 from app.core.security import create_access_token, verify_password
 from app.models.identity import User
 from app.schemas.auth import TokenResponse, UserResponse
@@ -39,18 +39,27 @@ def _login_rate_key(request: Request, email: str) -> str:
 async def _enforce_login_rate_limit(request: Request, email: str) -> str:
     key = _login_rate_key(request, email)
     try:
-        attempts = int(await redis_client.incr(key))
-        if attempts == 1:
-            await redis_client.expire(key, settings.login_rate_limit_window_seconds)
-        if attempts > settings.login_rate_limit_attempts:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many login attempts. Try again later.",
-            )
+        async with redis_connection() as client:
+            attempts = int(await client.incr(key))
+            if attempts == 1:
+                await client.expire(key, settings.login_rate_limit_window_seconds)
+            if attempts > settings.login_rate_limit_attempts:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Too many login attempts. Try again later.",
+                )
     except RedisError:
         # Authentication remains available if Redis is temporarily unavailable.
         pass
     return key
+
+
+async def _clear_login_rate_limit(key: str) -> None:
+    try:
+        async with redis_connection() as client:
+            await client.delete(key)
+    except RedisError:
+        pass
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -69,10 +78,7 @@ async def login(request: Request, form: OAuth2Form, session: DbSession) -> Token
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    try:
-        await redis_client.delete(rate_key)
-    except RedisError:
-        pass
+    await _clear_login_rate_limit(rate_key)
 
     roles = sorted(role.name for role in user.roles)
     token = create_access_token(
