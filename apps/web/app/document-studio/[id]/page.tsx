@@ -1,5 +1,6 @@
 "use client";
 
+import "../studio.css";
 import { useParams } from "next/navigation";
 import DocumentStudioEditor from "@/components/DocumentStudioEditor";
 
