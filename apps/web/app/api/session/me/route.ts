@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import {
   SESSION_COOKIE,
   apiBaseUrl,
+  sessionCookieSecure,
   toAuthUser,
   type ApiUser,
 } from "@/lib/server-session";
@@ -27,6 +28,7 @@ export async function GET() {
       name: SESSION_COOKIE,
       value: "",
       httpOnly: true,
+      secure: sessionCookieSecure(),
       sameSite: "strict",
       path: "/",
       maxAge: 0,
