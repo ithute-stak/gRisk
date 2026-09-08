@@ -14,12 +14,14 @@ from app.api.routes.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.claims import router as claims_router
 from app.api.routes.customers import router as customers_router
+from app.api.routes.documents import router as documents_router
 from app.api.routes.finance import router as finance_router
 from app.api.routes.guarantees import router as guarantees_router
 from app.api.routes.health import router as health_router
 from app.api.routes.insurance import router as insurance_router
 from app.api.routes.medical import router as medical_router
 from app.api.routes.notifications import router as notifications_router
+from app.api.routes.partners import router as partners_router
 from app.api.routes.portal import router as portal_router
 from app.api.routes.reports import router as reports_router
 from app.api.routes.risk import router as risk_router
@@ -115,6 +117,8 @@ app.include_router(medical_router, prefix="/api/v1")
 app.include_router(guarantees_router, prefix="/api/v1")
 app.include_router(risk_router, prefix="/api/v1")
 app.include_router(finance_router, prefix="/api/v1")
+app.include_router(documents_router, prefix="/api/v1")
+app.include_router(partners_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(portal_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
