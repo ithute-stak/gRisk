@@ -1,4 +1,14 @@
 services:
+  # PostgreSQL and Redis are private to the local Docker network. The base
+  # compose file publishes them for general development, but the isolated
+  # local-test profile does not need host access and should not collide with
+  # an existing PostgreSQL/Redis installation on ports 5432/6379.
+  postgres:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
   bootstrap-local-admin:
     build:
       context: ./apps/api
