@@ -1,0 +1,23 @@
+services:
+  bootstrap-local-admin:
+    build:
+      context: ./apps/api
+    restart: "no"
+    command: ["python", "-m", "app.scripts.bootstrap_local_admin"]
+    environment:
+      GRISK_ENVIRONMENT: development
+      GRISK_SECRET_KEY: ${GRISK_SECRET_KEY:-change-me}
+      GRISK_DATABASE_URL: ${GRISK_DATABASE_URL:-postgresql+asyncpg://grisk:grisk@postgres:5432/grisk}
+      GRISK_REDIS_URL: ${GRISK_REDIS_URL:-redis://redis:6379/0}
+      GRISK_CORS_ORIGINS: ${GRISK_CORS_ORIGINS:-http://localhost:8080}
+      GRISK_ALLOW_LOCAL_DEFAULT_ADMIN: "true"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  api:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      bootstrap-local-admin:
+        condition: service_completed_successfully
