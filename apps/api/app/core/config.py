@@ -2,6 +2,7 @@ from functools import lru_cache
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 DEFAULT_DATABASE_URL = "postgresql+asyncpg://grisk:grisk@postgres:5432/grisk"
 
@@ -47,10 +48,21 @@ class Settings(BaseSettings):
             raise ValueError("GRISK_DOCUMENT_MAX_UPLOAD_MB must be between 1 and 100")
         if self.environment.lower() != "production":
             return self
+
         if self.secret_key == "change-me" or len(self.secret_key) < 32:
             raise ValueError("GRISK_SECRET_KEY must be at least 32 characters in production")
-        if self.database_url == DEFAULT_DATABASE_URL:
-            raise ValueError("GRISK_DATABASE_URL must use explicit production credentials")
+
+        try:
+            database = make_url(self.database_url)
+        except Exception as exc:
+            raise ValueError("GRISK_DATABASE_URL must be a valid SQLAlchemy database URL") from exc
+        if not database.username or not database.password:
+            raise ValueError("GRISK_DATABASE_URL must include explicit production credentials")
+        if self.database_url == DEFAULT_DATABASE_URL or (
+            database.username == "grisk" and database.password == "grisk"
+        ):
+            raise ValueError("GRISK_DATABASE_URL must not use the default grisk/grisk credentials")
+
         if not self.cors_origin_list:
             raise ValueError("GRISK_CORS_ORIGINS must contain at least one production origin")
         if "*" in self.cors_origin_list:
