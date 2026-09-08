@@ -59,8 +59,12 @@ services:
       GRISK_CORS_ORIGINS: ${GRISK_CORS_ORIGINS:-http://localhost:8080}
       GRISK_LOGIN_RATE_LIMIT_ATTEMPTS: ${GRISK_LOGIN_RATE_LIMIT_ATTEMPTS:-10}
       GRISK_LOGIN_RATE_LIMIT_WINDOW_SECONDS: ${GRISK_LOGIN_RATE_LIMIT_WINDOW_SECONDS:-300}
+      GRISK_DOCUMENT_STORAGE_PATH: /data/documents
+      GRISK_DOCUMENT_MAX_UPLOAD_MB: ${GRISK_DOCUMENT_MAX_UPLOAD_MB:-20}
     ports:
       - "8000:8000"
+    volumes:
+      - grisk_documents:/data/documents
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -100,3 +104,4 @@ services:
 volumes:
   grisk_postgres:
   grisk_redis:
+  grisk_documents:
