@@ -48,8 +48,10 @@ services:
   web:
     build:
       context: ./apps/web
+    environment:
+      API_BASE_URL: ${WEB_API_BASE_URL:-http://api:8000}
     ports:
-      - "8080:8080"
+      - "8080:3000"
     depends_on:
       - api
 
