@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
@@ -104,7 +104,7 @@ async def risk_dashboard(_: CurrentUser, session: DbSession):
         select(func.count(RiskRegisterItem.id)).where(
             RiskRegisterItem.status.notin_(["mitigated", "accepted", "closed"]),
             RiskRegisterItem.due_date.is_not(None),
-            RiskRegisterItem.due_date < date.today(),
+            RiskRegisterItem.due_date < datetime.now(UTC).date(),
         )
     ) or 0
     return RiskDashboardResponse(
