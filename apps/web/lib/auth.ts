@@ -2,55 +2,63 @@
 
 import type { AuthUser } from "@/lib/types";
 
-const STORAGE_KEY = "grisk.access_token";
+const USER_STORAGE_KEY = "grisk.user";
 
-function decodeBase64Url(value: string): string {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
-  return atob(padded);
+function isAuthUser(value: unknown): value is AuthUser {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<AuthUser>;
+  return (
+    typeof candidate.id === "string" &&
+    candidate.id.length > 0 &&
+    Array.isArray(candidate.roles) &&
+    candidate.roles.every((role) => typeof role === "string") &&
+    typeof candidate.isSuperuser === "boolean"
+  );
 }
 
-export function parseUser(token: string | null): AuthUser | null {
-  if (!token) return null;
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(decodeBase64Url(parts[1])) as Record<string, unknown>;
-    const sub = typeof payload.sub === "string" ? payload.sub : null;
-    if (!sub) return null;
-    if (typeof payload.exp === "number" && payload.exp * 1000 <= Date.now()) return null;
-    return {
-      id: sub,
-      email: typeof payload.email === "string" ? payload.email : undefined,
-      name: typeof payload.name === "string" ? payload.name : undefined,
-      roles: Array.isArray(payload.roles) ? payload.roles.filter((role): role is string => typeof role === "string") : [],
-      isSuperuser: payload.is_superuser === true,
-    };
-  } catch {
-    return null;
-  }
-}
-
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  const token = sessionStorage.getItem(STORAGE_KEY);
-  if (token && !parseUser(token)) {
-    sessionStorage.removeItem(STORAGE_KEY);
-    return null;
-  }
-  return token;
-}
-
-export function saveToken(token: string): void {
-  sessionStorage.setItem(STORAGE_KEY, token);
+export function saveUser(user: AuthUser): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
   window.dispatchEvent(new Event("grisk-session"));
 }
 
-export function clearToken(): void {
-  sessionStorage.removeItem(STORAGE_KEY);
+export function clearUser(): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(USER_STORAGE_KEY);
   window.dispatchEvent(new Event("grisk-session"));
 }
 
 export function currentUser(): AuthUser | null {
-  return parseUser(getToken());
+  if (typeof window === "undefined") return null;
+  const raw = sessionStorage.getItem(USER_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isAuthUser(parsed)) {
+      sessionStorage.removeItem(USER_STORAGE_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    sessionStorage.removeItem(USER_STORAGE_KEY);
+    return null;
+  }
+}
+
+export async function refreshCurrentUser(): Promise<AuthUser | null> {
+  const response = await fetch("/api/session/me", { cache: "no-store" });
+  if (response.status === 401) {
+    clearUser();
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error("Unable to verify the current gRisk session.");
+  }
+  const user = (await response.json()) as unknown;
+  if (!isAuthUser(user)) {
+    clearUser();
+    throw new Error("Authentication service returned an invalid user session.");
+  }
+  saveUser(user);
+  return user;
 }
