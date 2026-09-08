@@ -4,19 +4,20 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { apiGet } from "@/lib/api";
-import type { ClaimList, CustomerList, Policy, QuoteList } from "@/lib/types";
+import type { ClaimList, CustomerList, MedicalMemberList, Policy, QuoteList } from "@/lib/types";
 
 const modules = [
   ["/customers", "Customers", "Customer onboarding, profiles and relationship records.", "CU"],
   ["/quotations", "Quotations", "Build, review and approve insurance quotations.", "QT"],
   ["/policies", "Policies", "Track active cover, premiums and policy expiry.", "PL"],
   ["/claims", "Claims", "Register, triage, assess and settle claims.", "CL"],
+  ["/medical", "Medical Aid", "Plans, members, benefits, utilisation, authorisations and health claims.", "MD"],
   ["/reports", "Reports", "Operational and management reporting workspace.", "RP"],
   ["/finance", "Finance", "Premium, billing and finance operations.", "FN"],
 ] as const;
 
 export default function DashboardPage() {
-  const [metrics, setMetrics] = useState({ customers: 0, quotes: 0, policies: 0, claims: 0 });
+  const [metrics, setMetrics] = useState({ customers: 0, quotes: 0, policies: 0, claims: 0, medicalMembers: 0 });
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -26,8 +27,15 @@ export default function DashboardPage() {
       apiGet<QuoteList>("/api/v1/insurance/quotes?page=1&page_size=1"),
       apiGet<Policy[]>("/api/v1/insurance/policies"),
       apiGet<ClaimList>("/api/v1/claims?page=1&page_size=1"),
-    ]).then(([customers, quotes, policies, claims]) => {
-      if (active) setMetrics({ customers: customers.total, quotes: quotes.total, policies: policies.length, claims: claims.total });
+      apiGet<MedicalMemberList>("/api/v1/medical/members?page=1&page_size=1"),
+    ]).then(([customers, quotes, policies, claims, medicalMembers]) => {
+      if (active) setMetrics({
+        customers: customers.total,
+        quotes: quotes.total,
+        policies: policies.length,
+        claims: claims.total,
+        medicalMembers: medicalMembers.total,
+      });
     }).catch((err) => {
       if (active) setError(err instanceof Error ? err.message : "Unable to load dashboard metrics.");
     });
@@ -39,7 +47,7 @@ export default function DashboardPage() {
       <div className="page-head">
         <div>
           <h1>Operations overview</h1>
-          <p>Monitor the core insurance workflow from customer onboarding through quotation, policy issuance and claims.</p>
+          <p>Monitor Guardrisk insurance and medical-aid operations from onboarding through cover, claims and member benefits.</p>
         </div>
         <div className="page-actions"><Link className="button" href="/quotations">New quotation</Link></div>
       </div>
@@ -50,7 +58,8 @@ export default function DashboardPage() {
         <div className="card metric"><div className="label">Customers</div><div className="value">{metrics.customers}</div><div className="hint">CRM records</div></div>
         <div className="card metric"><div className="label">Quotations</div><div className="value">{metrics.quotes}</div><div className="hint">All workflow stages</div></div>
         <div className="card metric"><div className="label">Policies</div><div className="value">{metrics.policies}</div><div className="hint">Policy register</div></div>
-        <div className="card metric"><div className="label">Claims</div><div className="value">{metrics.claims}</div><div className="hint">Claims register</div></div>
+        <div className="card metric"><div className="label">Claims</div><div className="value">{metrics.claims}</div><div className="hint">General claims register</div></div>
+        <div className="card metric"><div className="label">Medical members</div><div className="value">{metrics.medicalMembers}</div><div className="hint">Medical aid membership</div></div>
       </section>
 
       <div className="card-header" style={{ paddingLeft: 0, paddingRight: 0, borderBottom: 0 }}><h2>Workspaces</h2></div>
