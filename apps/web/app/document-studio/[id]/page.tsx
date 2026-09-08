@@ -2,6 +2,7 @@
 
 import "../studio.css";
 import "../loanhub-editor.css";
+import "../official-letterhead.css";
 import { useParams } from "next/navigation";
 import LoanHubDocumentStudioEditor from "@/components/LoanHubDocumentStudioEditor";
 
