@@ -12,7 +12,7 @@ async def test_root_and_health_endpoints() -> None:
         assert root_response.status_code == 200
         root_payload = root_response.json()
         assert root_payload["name"] == "gRisk API"
-        assert root_payload["version"] == "0.6.0"
+        assert root_payload["version"] == "0.7.0"
 
         health_response = await client.get("/api/v1/health")
         assert health_response.status_code == 200
