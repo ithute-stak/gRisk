@@ -57,6 +57,8 @@ jobs:
       GRISK_SECRET_KEY: ci-only-secret-key-with-at-least-32-bytes
       GRISK_DATABASE_URL: postgresql+asyncpg://grisk:grisk@127.0.0.1:5432/grisk
       GRISK_REDIS_URL: redis://127.0.0.1:6379/0
+      GRISK_DOCUMENT_STORAGE_PATH: /tmp/grisk-test-documents
+      GRISK_DOCUMENT_MAX_UPLOAD_MB: 20
     defaults:
       run:
         working-directory: apps/api
