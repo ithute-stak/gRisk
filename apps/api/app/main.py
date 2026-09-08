@@ -6,7 +6,10 @@ from time import perf_counter
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
+from app.api.deps import STAFF_ROLE_NAMES
 from app.api.routes.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.claims import router as claims_router
@@ -22,6 +25,9 @@ from app.api.routes.reports import router as reports_router
 from app.api.routes.risk import router as risk_router
 from app.core.config import get_settings
 from app.core.redis import redis_client
+from app.core.security import TokenError, decode_access_token
+from app.db.session import AsyncSessionLocal
+from app.models.identity import User
 from app.realtime.manager import manager
 
 settings = get_settings()
@@ -124,19 +130,48 @@ async def root() -> dict:
     }
 
 
+async def _websocket_user(websocket: WebSocket) -> User | None:
+    token = websocket.query_params.get("access_token")
+    if not token:
+        return None
+    try:
+        user_id = uuid.UUID(decode_access_token(token))
+    except (TokenError, ValueError):
+        return None
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User).options(selectinload(User.roles)).where(User.id == user_id)
+        )
+        user = result.scalar_one_or_none()
+        if user is None or not user.is_active:
+            return None
+        session.expunge(user)
+        return user
+
+
+def _websocket_channel_allowed(user: User, channel: str) -> bool:
+    role_names = {role.name for role in user.roles}
+    is_staff = user.is_superuser or bool(role_names & STAFF_ROLE_NAMES)
+    if is_staff:
+        return True
+    return channel == f"notifications:{user.id}"
+
+
 @app.websocket("/ws/{channel}")
 async def websocket_endpoint(websocket: WebSocket, channel: str) -> None:
+    user = await _websocket_user(websocket)
+    if user is None:
+        await websocket.close(code=4401, reason="Authentication required")
+        return
+    if not _websocket_channel_allowed(user, channel):
+        await websocket.close(code=4403, reason="Channel access denied")
+        return
+
     await manager.connect(channel, websocket)
     try:
         while True:
-            payload = await websocket.receive_json()
-            await manager.broadcast(
-                channel,
-                {
-                    "channel": channel,
-                    "event": "message",
-                    "data": payload,
-                },
-            )
+            # Realtime channels are server-published. Client messages are only
+            # consumed to detect disconnects and are never rebroadcast.
+            await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(channel, websocket)
