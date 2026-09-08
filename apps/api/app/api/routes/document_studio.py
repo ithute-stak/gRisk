@@ -1,5 +1,5 @@
 import re
-from datetime import date
+from datetime import UTC, datetime
 from io import BytesIO
 
 from fastapi import APIRouter, Request
@@ -38,7 +38,7 @@ class LetterheadDocument(BaseModel):
     recipient_address: str = Field(default="Maseru 100\nLesotho", max_length=500)
     reference: str = Field(default="GRISK/DEMO/001", max_length=80)
     document_date: str = Field(
-        default_factory=lambda: date.today().strftime("%d %B %Y"),
+        default_factory=lambda: datetime.now(UTC).strftime("%d %B %Y"),
         max_length=80,
     )
     subject: str = Field(default="DEMO DOCUMENT STUDIO LETTER", max_length=220)
