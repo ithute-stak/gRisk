@@ -1,0 +1,23 @@
+name: gRisk Container Validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grisk-containers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  containers:
+    name: Compose + Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Validate Compose file
+        run: docker compose config
+      - name: Build application images
+        run: docker compose build api web

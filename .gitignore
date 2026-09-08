@@ -7,7 +7,13 @@ __pycache__/
 .venv/
 venv/
 
-# .NET
+# Node / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# Legacy .NET migration artifacts
 bin/
 obj/
 *.user
