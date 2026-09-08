@@ -112,7 +112,7 @@ export function removeStudioCollaborator(id: string, userId: string) {
   return apiRequest<void>(`/api/v1/document-studio/documents/${id}/collaborators/${userId}`, { method: "DELETE" });
 }
 
-export function downloadStudioDocument(id: string, format: "pdf" | "docx") {
+export function downloadStudioDocument(id: string, format: "pdf" | "docx" | "word") {
   return apiDownload(`/api/v1/document-studio/documents/${id}/export/${format}`);
 }
 
