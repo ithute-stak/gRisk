@@ -40,16 +40,24 @@ async def test_document_studio_renders_fillable_signature_pdf() -> None:
             "/api/v1/document-studio/render",
             headers=headers,
             json={
+                "document_title": "Formal Correspondence",
                 "recipient_name": "The Managing Director",
                 "recipient_company": "Demo Client (Pty) Ltd",
                 "recipient_address": "Maseru 100\nLesotho",
+                "recipient_phone": "+266 2231 0000",
+                "recipient_email": "director@example.com",
                 "reference": "GRISK/TEST/001",
                 "document_date": "08 September 2026",
                 "subject": "Document Studio Demo Letter",
-                "body": "Dear Sir/Madam,\n\nThis is a generated PDF with a digital signature field.",
+                "body": (
+                    "Dear Sir/Madam,\n\n"
+                    "This is a generated executive letterhead PDF with a digital signature field."
+                ),
                 "signatory_name": "Authorised Signatory",
                 "signatory_title": "Guardrisk Insurance Brokers",
+                "signatory_contact": "+266 2232 2537 | info@guardrisk.co.ls",
                 "include_signature_field": True,
+                "include_document_stamp": True,
             },
         )
 
@@ -57,10 +65,13 @@ async def test_document_studio_renders_fillable_signature_pdf() -> None:
         assert response.headers["content-type"].startswith("application/pdf")
         assert "document-studio-demo-letter.pdf" in response.headers["content-disposition"]
         assert response.content.startswith(b"%PDF")
-        assert len(response.content) > 2000
+        assert len(response.content) > 3000
 
         reader = PdfReader(BytesIO(response.content))
         fields = reader.get_fields()
         assert fields is not None
         assert "signature" in fields
         assert fields["signature"]["/FT"] == "/Sig"
+        assert reader.metadata is not None
+        assert reader.metadata.creator == "gRisk Document Studio"
+        assert reader.metadata.author == "Guardrisk Insurance Brokers"
