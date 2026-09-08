@@ -2,6 +2,17 @@ name: gRisk Container Validation
 
 on:
   workflow_dispatch:
+  # Final release-candidate branch gets one automatic full-stack smoke run.
+  # Normal feature work remains manual to conserve hosted-runner minutes.
+  push:
+    branches:
+      - feature/phase-8-observability-release
+    paths:
+      - "docker-compose.yml"
+      - "docker-compose.prod.yml"
+      - "apps/api/**"
+      - "apps/web/**"
+      - ".github/workflows/containers.yml"
 
 permissions:
   contents: read
@@ -24,6 +35,7 @@ jobs:
       GRISK_REDIS_URL: redis://redis:6379/0
       GRISK_CORS_ORIGINS: http://localhost:8080
       GRISK_WEB_PORT: 8080
+      GRISK_COOKIE_SECURE: "false"
     steps:
       - name: Checkout
         uses: actions/checkout@v5
