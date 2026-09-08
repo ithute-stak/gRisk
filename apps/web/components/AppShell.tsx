@@ -19,6 +19,8 @@ const staffNavigation = [
   ["/bonds", "Bonds & Guarantees", "BG"],
   ["/risk", "Risk Management", "RK"],
   ["/finance", "Finance", "FN"],
+  ["/documents", "Documents", "DC"],
+  ["/partners", "Partners", "PR"],
   ["/notifications", "Notifications", "NT"],
   ["/portal", "Customer Portal", "PT"],
   ["/reports", "Reports", "RP"],
