@@ -1,5 +1,6 @@
 "use client";
 
+import "./studio.css";
 import AppShell from "@/components/AppShell";
 import DocumentStudioHome from "@/components/DocumentStudioHome";
 
