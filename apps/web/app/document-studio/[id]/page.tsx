@@ -1,10 +1,11 @@
 "use client";
 
 import "../studio.css";
+import "../loanhub-editor.css";
 import { useParams } from "next/navigation";
-import DocumentStudioEditor from "@/components/DocumentStudioEditor";
+import LoanHubDocumentStudioEditor from "@/components/LoanHubDocumentStudioEditor";
 
 export default function DocumentStudioEditorPage() {
   const params = useParams<{ id: string }>();
-  return <DocumentStudioEditor documentId={params.id} />;
+  return <LoanHubDocumentStudioEditor documentId={params.id} />;
 }
