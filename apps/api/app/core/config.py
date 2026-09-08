@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +15,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     jwt_issuer: str = "grisk-api"
     jwt_audience: str = "grisk-web"
+    login_rate_limit_attempts: int = 10
+    login_rate_limit_window_seconds: int = 300
 
     database_url: str = "postgresql+asyncpg://grisk:grisk@postgres:5432/grisk"
     redis_url: str = "redis://redis:6379/0"
@@ -32,6 +35,20 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+
+    @model_validator(mode="after")
+    def validate_production_settings(self):
+        if self.environment.lower() != "production":
+            return self
+        if self.secret_key == "change-me" or len(self.secret_key) < 32:
+            raise ValueError("GRISK_SECRET_KEY must be at least 32 characters in production")
+        if "*" in self.cors_origin_list:
+            raise ValueError("Wildcard CORS origins are not allowed in production")
+        if self.login_rate_limit_attempts < 1:
+            raise ValueError("GRISK_LOGIN_RATE_LIMIT_ATTEMPTS must be at least 1")
+        if self.login_rate_limit_window_seconds < 30:
+            raise ValueError("GRISK_LOGIN_RATE_LIMIT_WINDOW_SECONDS must be at least 30")
+        return self
 
 
 @lru_cache
