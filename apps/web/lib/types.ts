@@ -200,3 +200,98 @@ export type BenefitBalance = {
   used_units: number;
   remaining_units: number | null;
 };
+
+export type GuaranteeEvent = {
+  id: string;
+  event_type: string;
+  note: string | null;
+  from_status: string | null;
+  to_status: string | null;
+  actor_user_id: string | null;
+  created_at: string;
+};
+
+export type Guarantee = {
+  id: string;
+  guarantee_number: string;
+  customer_id: string;
+  guarantee_type: string;
+  status: string;
+  beneficiary: string;
+  principal: string | null;
+  tender_reference: string | null;
+  contract_reference: string | null;
+  currency: string;
+  contract_value: string | null;
+  guarantee_amount: string;
+  issuer_name: string | null;
+  effective_date: string | null;
+  expiry_date: string | null;
+  assigned_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+  contract_description?: string | null;
+  notes?: string | null;
+  events?: GuaranteeEvent[];
+};
+
+export type GuaranteeList = {
+  items: Guarantee[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export type RiskRegisterItem = {
+  id: string;
+  assessment_id: string;
+  category: string;
+  title: string;
+  description: string | null;
+  likelihood: number;
+  impact: number;
+  inherent_score: number;
+  inherent_level: string;
+  existing_controls: string | null;
+  treatment_plan: string | null;
+  risk_owner: string | null;
+  due_date: string | null;
+  status: string;
+  residual_likelihood: number | null;
+  residual_impact: number | null;
+  residual_score: number | null;
+  residual_level: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RiskAssessment = {
+  id: string;
+  assessment_number: string;
+  customer_id: string;
+  assessment_type: string;
+  title: string;
+  assessment_date: string;
+  status: string;
+  overall_level: string | null;
+  assigned_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+  summary?: string | null;
+  recommendations?: string | null;
+  items?: RiskRegisterItem[];
+};
+
+export type RiskAssessmentList = {
+  items: RiskAssessment[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export type RiskDashboard = {
+  assessments: number;
+  open_items: number;
+  high_or_critical_items: number;
+  overdue_items: number;
+};
