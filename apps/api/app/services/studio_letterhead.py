@@ -319,8 +319,8 @@ def _add_header(section: Any) -> None:
     rule.autofit = False
     rule.rows[0].height = Mm(0.8)
     rule.rows[0].height_rule = WD_ROW_HEIGHT_RULE.EXACTLY
-    rule.cells[0].width = Mm(29)
-    rule.cells[1].width = int(available - Mm(29))
+    rule.rows[0].cells[0].width = Mm(29)
+    rule.rows[0].cells[1].width = int(available - Mm(29))
     for cell in rule.rows[0].cells:
         _zero_cell_margins(cell)
     _shade_cell(rule.cell(0, 0), ORANGE)
