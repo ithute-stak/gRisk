@@ -79,6 +79,11 @@ export function apiUpload<T>(path: string, form: FormData): Promise<T> {
   return apiRequest<T>(path, { method: "POST", body: form });
 }
 
+function filenameFromDisposition(disposition: string | null): string | null {
+  const filenameMatch = disposition?.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
+  return filenameMatch ? decodeURIComponent(filenameMatch[1].replace(/^\"|\"$/g, "")) : null;
+}
+
 export async function apiDownload(path: string): Promise<{ blob: Blob; filename: string | null }> {
   const response = await fetch(proxyUrl(path), { method: "GET", cache: "no-store" });
   if (!response.ok) {
@@ -86,10 +91,31 @@ export async function apiDownload(path: string): Promise<{ blob: Blob; filename:
     await handleUnauthorized(response);
     throw new ApiError(message, response.status);
   }
-  const disposition = response.headers.get("content-disposition");
-  const filenameMatch = disposition?.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
-  const filename = filenameMatch ? decodeURIComponent(filenameMatch[1].replace(/^\"|\"$/g, "")) : null;
-  return { blob: await response.blob(), filename };
+  return {
+    blob: await response.blob(),
+    filename: filenameFromDisposition(response.headers.get("content-disposition")),
+  };
+}
+
+export async function apiDownloadPost(path: string, payload: unknown): Promise<{ blob: Blob; filename: string | null }> {
+  const response = await fetch(proxyUrl(path), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-gRisk-Request": "1",
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const message = await readError(response);
+    await handleUnauthorized(response);
+    throw new ApiError(message, response.status);
+  }
+  return {
+    blob: await response.blob(),
+    filename: filenameFromDisposition(response.headers.get("content-disposition")),
+  };
 }
 
 export async function login(email: string, password: string): Promise<AuthUser> {

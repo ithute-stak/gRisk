@@ -21,6 +21,7 @@ const staffNavigation = [
   ["/risk", "Risk Management", "RK"],
   ["/finance", "Finance", "FN"],
   ["/documents", "Documents", "DC"],
+  ["/document-studio", "Document Studio", "DS"],
   ["/partners", "Partners", "PR"],
   ["/notifications", "Notifications", "NT"],
   ["/portal", "Customer Portal", "PT"],

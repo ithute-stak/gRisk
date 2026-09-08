@@ -14,6 +14,7 @@ from app.api.routes.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.claims import router as claims_router
 from app.api.routes.customers import router as customers_router
+from app.api.routes.document_studio import router as document_studio_router
 from app.api.routes.documents import router as documents_router
 from app.api.routes.finance import router as finance_router
 from app.api.routes.guarantees import router as guarantees_router
@@ -119,6 +120,7 @@ app.include_router(guarantees_router, prefix="/api/v1")
 app.include_router(risk_router, prefix="/api/v1")
 app.include_router(finance_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
+app.include_router(document_studio_router, prefix="/api/v1")
 app.include_router(partners_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(portal_router, prefix="/api/v1")
