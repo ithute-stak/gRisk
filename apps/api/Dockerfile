@@ -14,7 +14,8 @@ COPY alembic ./alembic
 COPY app ./app
 
 RUN useradd --create-home --uid 10001 grisk \
-    && chown -R grisk:grisk /app
+    && mkdir -p /data/documents \
+    && chown -R grisk:grisk /app /data/documents
 USER grisk
 
 EXPOSE 8000
