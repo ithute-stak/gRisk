@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,6 +33,16 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+
+    @model_validator(mode="after")
+    def validate_production_settings(self):
+        if self.environment.lower() != "production":
+            return self
+        if self.secret_key == "change-me" or len(self.secret_key) < 32:
+            raise ValueError("GRISK_SECRET_KEY must be at least 32 characters in production")
+        if "*" in self.cors_origin_list:
+            raise ValueError("Wildcard CORS origins are not allowed in production")
+        return self
 
 
 @lru_cache
