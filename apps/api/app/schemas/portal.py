@@ -3,9 +3,13 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 PortalRole = Literal["owner", "admin", "member"]
+
+
+def _money(value: Decimal) -> str:
+    return format(value, ".2f")
 
 
 class PortalAccessCreate(BaseModel):
@@ -62,6 +66,10 @@ class PortalPolicySummary(BaseModel):
     start_date: date
     end_date: date
 
+    @field_serializer("sum_insured", "premium")
+    def serialize_amounts(self, value: Decimal) -> str:
+        return _money(value)
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -74,6 +82,10 @@ class PortalClaimSummary(BaseModel):
     claim_amount: Decimal
     approved_amount: Decimal | None
     status: str
+
+    @field_serializer("claim_amount", "approved_amount")
+    def serialize_amounts(self, value: Decimal | None) -> str | None:
+        return None if value is None else _money(value)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -99,6 +111,10 @@ class PortalGuaranteeSummary(BaseModel):
     guarantee_amount: Decimal
     expiry_date: date | None
 
+    @field_serializer("guarantee_amount")
+    def serialize_amount(self, value: Decimal) -> str:
+        return _money(value)
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -114,6 +130,10 @@ class PortalInvoiceSummary(BaseModel):
     issue_date: date
     due_date: date
 
+    @field_serializer("amount_due", "amount_paid")
+    def serialize_amounts(self, value: Decimal) -> str:
+        return _money(value)
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -126,3 +146,7 @@ class PortalOverviewResponse(BaseModel):
     invoices: list[PortalInvoiceSummary] = Field(default_factory=list)
     outstanding_balance: Decimal
     unread_notifications: int
+
+    @field_serializer("outstanding_balance")
+    def serialize_outstanding_balance(self, value: Decimal) -> str:
+        return _money(value)
