@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - development
     paths:
       - "apps/api/**"
       - ".github/workflows/ci.yml"
@@ -12,9 +11,12 @@ on:
     branches:
       - main
       - development
+    types:
+      - ready_for_review
     paths:
       - "apps/api/**"
       - ".github/workflows/ci.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
