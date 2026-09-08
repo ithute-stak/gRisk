@@ -108,7 +108,7 @@ def _draw_brand_mark(c: canvas.Canvas, x: float, y: float) -> None:
 
 
 def _draw_top_accent(c: canvas.Canvas) -> None:
-    width, height = A4
+    _, height = A4
     path = c.beginPath()
     path.moveTo(0, height)
     path.lineTo(82 * mm, height)
