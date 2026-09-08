@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { ActionMenu, SmartDialog } from "@/components/SmartUi";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import type {
   CustomerList,
@@ -24,6 +25,17 @@ const emptyClaim = {
   provider_name: "",
   description: "",
 };
+const emptyBenefit = {
+  code: "",
+  name: "",
+  category: "outpatient",
+  annual_visit_limit: "",
+  annual_monetary_limit: "",
+  per_event_limit: "",
+  requires_authorisation: false,
+};
+const emptyDependant = { first_name: "", last_name: "", relationship_type: "child", date_of_birth: "" };
+const emptyUse = { benefit_id: "", amount: "0", units: "1", provider_name: "" };
 
 const claimTransitions: Record<string, string[]> = {
   submitted: ["review", "declined"],
@@ -47,6 +59,14 @@ export default function MedicalPage() {
   const [memberForm, setMemberForm] = useState(emptyMember);
   const [planForm, setPlanForm] = useState(emptyPlan);
   const [claimForm, setClaimForm] = useState(emptyClaim);
+  const [benefitTarget, setBenefitTarget] = useState<MedicalPlan | null>(null);
+  const [benefitForm, setBenefitForm] = useState(emptyBenefit);
+  const [dependantTarget, setDependantTarget] = useState<MedicalMember | null>(null);
+  const [dependantForm, setDependantForm] = useState(emptyDependant);
+  const [utilisationTarget, setUtilisationTarget] = useState<MedicalMember | null>(null);
+  const [utilisationForm, setUtilisationForm] = useState(emptyUse);
+  const [claimWorkflow, setClaimWorkflow] = useState<{ claim: MedicalClaim; next: string } | null>(null);
+  const [approvedAmount, setApprovedAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -105,29 +125,23 @@ export default function MedicalPage() {
     }
   }
 
-  async function addBenefit(plan: MedicalPlan) {
-    const code = window.prompt(`Benefit code for ${plan.name}:`);
-    if (!code?.trim()) return;
-    const name = window.prompt("Benefit name:");
-    if (!name?.trim()) return;
-    const category = window.prompt("Benefit category (for example outpatient, dental, maternity):", "outpatient");
-    if (!category?.trim()) return;
-    const annualVisits = window.prompt("Annual visit limit (leave blank for no visit limit):", "");
-    const annualAmount = window.prompt("Annual monetary limit in LSL (leave blank for no monetary limit):", "");
-    const perEvent = window.prompt("Per-event limit in LSL (leave blank for no event limit):", "");
-    const requiresAuthorisation = window.confirm("Does this benefit require prior authorisation?");
+  async function createBenefit(event: FormEvent) {
+    event.preventDefault();
+    if (!benefitTarget) return;
     setBusy(true);
     setError("");
     try {
-      await apiPost<MedicalBenefit>(`/api/v1/medical/plans/${plan.id}/benefits`, {
-        code: code.trim(),
-        name: name.trim(),
-        category: category.trim(),
-        annual_visit_limit: annualVisits?.trim() ? Number(annualVisits) : null,
-        annual_monetary_limit: annualAmount?.trim() || null,
-        per_event_limit: perEvent?.trim() || null,
-        requires_authorisation: requiresAuthorisation,
+      await apiPost<MedicalBenefit>(`/api/v1/medical/plans/${benefitTarget.id}/benefits`, {
+        code: benefitForm.code.trim(),
+        name: benefitForm.name.trim(),
+        category: benefitForm.category.trim(),
+        annual_visit_limit: benefitForm.annual_visit_limit.trim() ? Number(benefitForm.annual_visit_limit) : null,
+        annual_monetary_limit: benefitForm.annual_monetary_limit.trim() || null,
+        per_event_limit: benefitForm.per_event_limit.trim() || null,
+        requires_authorisation: benefitForm.requires_authorisation,
       });
+      setBenefitTarget(null);
+      setBenefitForm(emptyBenefit);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to add medical benefit.");
@@ -158,24 +172,21 @@ export default function MedicalPage() {
     }
   }
 
-  async function addDependant(member: MedicalMember) {
-    const firstName = window.prompt(`Dependant first name for ${member.member_number}:`);
-    if (!firstName?.trim()) return;
-    const lastName = window.prompt("Dependant last name:");
-    if (!lastName?.trim()) return;
-    const relationship = window.prompt("Relationship (child, spouse, parent, other):", "child");
-    if (!relationship?.trim()) return;
-    const dateOfBirth = window.prompt("Date of birth (YYYY-MM-DD, optional):", "");
+  async function createDependant(event: FormEvent) {
+    event.preventDefault();
+    if (!dependantTarget) return;
     setBusy(true);
     setError("");
     try {
-      await apiPost(`/api/v1/medical/members/${member.id}/dependants`, {
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        relationship_type: relationship.trim(),
-        date_of_birth: dateOfBirth?.trim() || null,
+      await apiPost(`/api/v1/medical/members/${dependantTarget.id}/dependants`, {
+        first_name: dependantForm.first_name.trim(),
+        last_name: dependantForm.last_name.trim(),
+        relationship_type: dependantForm.relationship_type.trim(),
+        date_of_birth: dependantForm.date_of_birth || null,
         status: "active",
       });
+      setDependantTarget(null);
+      setDependantForm(emptyDependant);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to add dependant.");
@@ -184,42 +195,38 @@ export default function MedicalPage() {
     }
   }
 
-  async function recordUse(member: MedicalMember) {
-    const plan = planMap.get(member.plan_id);
-    if (!plan?.benefits.length) {
-      setError("This member plan has no configured benefits yet.");
-      return;
-    }
-    const choices = plan.benefits.map((item) => `${item.code}: ${item.name}`).join("\n");
-    const code = window.prompt(`Benefit code to use:\n${choices}`);
-    if (!code?.trim()) return;
-    const benefit = plan.benefits.find((item) => item.code.toLowerCase() === code.trim().toLowerCase());
-    if (!benefit) {
-      setError("Benefit code was not found on the member plan.");
-      return;
-    }
-    const amount = window.prompt("Amount used (LSL):", "0");
-    if (amount === null) return;
-    const units = window.prompt("Visits/units used:", "1");
-    if (units === null) return;
-    const provider = window.prompt("Provider name (optional):", "");
+  async function createUtilisation(event: FormEvent) {
+    event.preventDefault();
+    if (!utilisationTarget) return;
     setBusy(true);
     setError("");
     try {
       await apiPost("/api/v1/medical/utilisations", {
-        member_id: member.id,
-        benefit_id: benefit.id,
+        member_id: utilisationTarget.id,
+        benefit_id: utilisationForm.benefit_id,
         service_date: new Date().toISOString().slice(0, 10),
-        amount: amount || "0",
-        units: Number(units || "1"),
-        provider_name: provider?.trim() || null,
+        amount: utilisationForm.amount || "0",
+        units: Number(utilisationForm.units || "1"),
+        provider_name: utilisationForm.provider_name.trim() || null,
       });
+      setUtilisationTarget(null);
+      setUtilisationForm(emptyUse);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to record benefit utilisation.");
     } finally {
       setBusy(false);
     }
+  }
+
+  function beginUtilisation(member: MedicalMember) {
+    const plan = planMap.get(member.plan_id);
+    if (!plan?.benefits.length) {
+      setError("This member plan has no configured benefits yet.");
+      return;
+    }
+    setUtilisationTarget(member);
+    setUtilisationForm({ ...emptyUse, benefit_id: plan.benefits[0]?.id || "" });
   }
 
   async function createClaim(event: FormEvent) {
@@ -247,20 +254,24 @@ export default function MedicalPage() {
     }
   }
 
-  async function changeClaimStatus(claim: MedicalClaim, next: string) {
-    let approvedAmount: string | undefined;
-    if (next === "approved") {
-      const value = window.prompt(`Approved amount (claim amount ${claim.claim_amount}):`, claim.claim_amount);
-      if (value === null || !value.trim()) return;
-      approvedAmount = value.trim();
-    }
+  function beginClaimStatus(claim: MedicalClaim, next: string) {
+    setClaimWorkflow({ claim, next });
+    setApprovedAmount(next === "approved" ? claim.claim_amount : "");
+  }
+
+  async function submitClaimStatus(event: FormEvent) {
+    event.preventDefault();
+    if (!claimWorkflow) return;
+    if (claimWorkflow.next === "approved" && !approvedAmount.trim()) return;
     setBusy(true);
     setError("");
     try {
-      await apiPatch<MedicalClaim>(`/api/v1/medical/claims/${claim.id}/status`, {
-        status: next,
-        approved_amount: approvedAmount,
+      await apiPatch<MedicalClaim>(`/api/v1/medical/claims/${claimWorkflow.claim.id}/status`, {
+        status: claimWorkflow.next,
+        approved_amount: claimWorkflow.next === "approved" ? approvedAmount.trim() : undefined,
       });
+      setClaimWorkflow(null);
+      setApprovedAmount("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to update medical claim.");
@@ -272,6 +283,7 @@ export default function MedicalPage() {
   const activeMembers = members.items.filter((item) => item.status === "active").length;
   const openClaims = claims.filter((item) => !["paid", "closed", "declined"].includes(item.status)).length;
   const totalBenefits = plans.reduce((sum, plan) => sum + plan.benefits.length, 0);
+  const utilisationPlan = utilisationTarget ? planMap.get(utilisationTarget.plan_id) : null;
 
   return (
     <AppShell>
@@ -281,9 +293,9 @@ export default function MedicalPage() {
           <p>Manage plans, benefits, members, dependants, utilisation, authorisations and medical or health-cash claims.</p>
         </div>
         <div className="page-actions">
-          <button className="button secondary" onClick={() => setShowPlanForm((value) => !value)}>New plan</button>
-          <button className="button secondary" onClick={() => setShowClaimForm((value) => !value)}>Medical claim</button>
-          <button className="button" onClick={() => setShowMemberForm((value) => !value)}>Enrol member</button>
+          <button className="button secondary" onClick={() => setShowPlanForm(true)}>New plan</button>
+          <button className="button secondary" onClick={() => setShowClaimForm(true)}>Medical claim</button>
+          <button className="button" onClick={() => setShowMemberForm(true)}>Enrol member</button>
         </div>
       </div>
 
@@ -296,60 +308,17 @@ export default function MedicalPage() {
         <div className="card metric"><div className="label">Open claims</div><div className="value">{openClaims}</div><div className="hint">Medical and cash-plan workflow</div></div>
       </section>
 
-      {showPlanForm && (
-        <form className="card pad" onSubmit={createPlan} style={{ marginBottom: 18 }}>
-          <div className="card-header" style={{ padding: 0, paddingBottom: 16, marginBottom: 16 }}><h2>Create medical plan</h2></div>
-          <div className="form-grid">
-            <div className="field"><label>Code</label><input className="input" value={planForm.code} onChange={(e) => setPlanForm({ ...planForm, code: e.target.value })} required /></div>
-            <div className="field"><label>Plan name</label><input className="input" value={planForm.name} onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })} required /></div>
-            <div className="field"><label>Monthly premium (LSL)</label><input className="input" type="number" min="0" step="0.01" value={planForm.monthly_premium} onChange={(e) => setPlanForm({ ...planForm, monthly_premium: e.target.value })} /></div>
-            <div className="field full"><label>Description</label><textarea className="textarea" value={planForm.description} onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })} /></div>
-          </div>
-          <div className="form-actions"><button type="button" className="button secondary" onClick={() => setShowPlanForm(false)}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Create plan"}</button></div>
-        </form>
-      )}
-
-      {showMemberForm && (
-        <form className="card pad" onSubmit={createMember} style={{ marginBottom: 18 }}>
-          <div className="card-header" style={{ padding: 0, paddingBottom: 16, marginBottom: 16 }}><h2>Enrol medical member</h2></div>
-          <div className="form-grid">
-            <div className="field full"><label>Customer</label><select className="select" value={memberForm.customer_id} onChange={(e) => setMemberForm({ ...memberForm, customer_id: e.target.value })} required><option value="">Select customer</option>{customers.items.map((customer) => <option key={customer.id} value={customer.id}>{customer.customer_number} · {customer.display_name}</option>)}</select></div>
-            <div className="field"><label>Medical plan</label><select className="select" value={memberForm.plan_id} onChange={(e) => setMemberForm({ ...memberForm, plan_id: e.target.value })} required><option value="">Select plan</option>{plans.filter((plan) => plan.is_active).map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}</select></div>
-            <div className="field"><label>Start date</label><input className="input" type="date" value={memberForm.start_date} onChange={(e) => setMemberForm({ ...memberForm, start_date: e.target.value })} required /></div>
-            <div className="field"><label>End date (optional)</label><input className="input" type="date" value={memberForm.end_date} onChange={(e) => setMemberForm({ ...memberForm, end_date: e.target.value })} /></div>
-          </div>
-          <div className="form-actions"><button type="button" className="button secondary" onClick={() => setShowMemberForm(false)}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Enrol member"}</button></div>
-        </form>
-      )}
-
-      {showClaimForm && (
-        <form className="card pad" onSubmit={createClaim} style={{ marginBottom: 18 }}>
-          <div className="card-header" style={{ padding: 0, paddingBottom: 16, marginBottom: 16 }}><h2>Register medical / health-cash claim</h2></div>
-          <div className="form-grid">
-            <div className="field full"><label>Member</label><select className="select" value={claimForm.member_id} onChange={(e) => setClaimForm({ ...claimForm, member_id: e.target.value })} required><option value="">Select member</option>{members.items.map((member) => <option key={member.id} value={member.id}>{member.member_number} · {customerMap.get(member.customer_id) || "Customer"}</option>)}</select></div>
-            <div className="field"><label>Claim kind</label><select className="select" value={claimForm.claim_kind} onChange={(e) => setClaimForm({ ...claimForm, claim_kind: e.target.value })}><option value="medical">Medical</option><option value="cash_plan">Health cash plan</option></select></div>
-            <div className="field"><label>Service date</label><input className="input" type="date" value={claimForm.service_date} onChange={(e) => setClaimForm({ ...claimForm, service_date: e.target.value })} required /></div>
-            <div className="field"><label>Admission date</label><input className="input" type="date" value={claimForm.admission_date} onChange={(e) => setClaimForm({ ...claimForm, admission_date: e.target.value })} required={claimForm.claim_kind === "cash_plan"} /></div>
-            <div className="field"><label>Discharge date</label><input className="input" type="date" value={claimForm.discharge_date} onChange={(e) => setClaimForm({ ...claimForm, discharge_date: e.target.value })} required={claimForm.claim_kind === "cash_plan"} /></div>
-            <div className="field"><label>Claim amount</label><input className="input" type="number" min="0" step="0.01" value={claimForm.claim_amount} onChange={(e) => setClaimForm({ ...claimForm, claim_amount: e.target.value })} required /></div>
-            <div className="field"><label>Provider</label><input className="input" value={claimForm.provider_name} onChange={(e) => setClaimForm({ ...claimForm, provider_name: e.target.value })} /></div>
-            <div className="field full"><label>Description</label><textarea className="textarea" value={claimForm.description} onChange={(e) => setClaimForm({ ...claimForm, description: e.target.value })} /></div>
-          </div>
-          <div className="form-actions"><button type="button" className="button secondary" onClick={() => setShowClaimForm(false)}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Register claim"}</button></div>
-        </form>
-      )}
-
       <section className="card" style={{ marginBottom: 20 }}>
         <div className="card-header"><div><h2>Plan & benefit catalogue</h2><p>Benefit limits remain configurable so Guardrisk can apply the exact approved product rules.</p></div></div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Plan</th><th>Premium</th><th>Benefits</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Plan</th><th>Premium</th><th>Benefits</th><th>Status</th><th aria-label="Actions" /></tr></thead>
             <tbody>{plans.map((plan) => <tr key={plan.id}>
               <td><div className="cell-title">{plan.name}</div><div className="cell-sub">{plan.code} · {plan.description || "No description"}</div></td>
               <td>{plan.monthly_premium ? `${plan.currency} ${Number(plan.monthly_premium).toLocaleString()}` : "Configurable"}</td>
               <td><div className="cell-title">{plan.benefits.length}</div><div className="cell-sub">{plan.benefits.slice(0, 3).map((benefit) => benefit.name).join(" · ") || "No benefits configured"}</div></td>
               <td><span className={`badge ${plan.is_active ? "active" : "cancelled"}`}>{plan.is_active ? "active" : "inactive"}</span></td>
-              <td><button className="button secondary small" disabled={busy} onClick={() => addBenefit(plan)}>Add benefit</button></td>
+              <td><ActionMenu label={`Actions for ${plan.name}`}><button type="button" className="action-menu-item" disabled={busy} onClick={() => { setBenefitTarget(plan); setBenefitForm(emptyBenefit); }}>Add benefit</button></ActionMenu></td>
             </tr>)}</tbody>
           </table>
           {!plans.length && <div className="empty"><strong>No medical plans yet</strong>Create the first Guardrisk medical aid plan.</div>}
@@ -363,14 +332,19 @@ export default function MedicalPage() {
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Member</th><th>Customer</th><th>Plan</th><th>Cover period</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Member</th><th>Customer</th><th>Plan</th><th>Cover period</th><th>Status</th><th aria-label="Actions" /></tr></thead>
             <tbody>{members.items.map((member) => <tr key={member.id}>
               <td><div className="cell-title">{member.member_number}</div><div className="cell-sub">Created {new Date(member.created_at).toLocaleDateString()}</div></td>
               <td>{customerMap.get(member.customer_id) || member.customer_id.slice(0, 8)}</td>
               <td>{planMap.get(member.plan_id)?.name || member.plan_id.slice(0, 8)}</td>
               <td>{new Date(member.start_date).toLocaleDateString()} → {member.end_date ? new Date(member.end_date).toLocaleDateString() : "Open"}</td>
               <td><span className={`badge ${member.status}`}>{member.status}</span></td>
-              <td><div className="actions"><button className="button ghost small" disabled={busy} onClick={() => addDependant(member)}>Add dependant</button><button className="button secondary small" disabled={busy} onClick={() => recordUse(member)}>Record benefit use</button></div></td>
+              <td>
+                <ActionMenu label={`Actions for ${member.member_number}`}>
+                  <button type="button" className="action-menu-item" disabled={busy} onClick={() => { setDependantTarget(member); setDependantForm(emptyDependant); }}>Add dependant</button>
+                  <button type="button" className="action-menu-item" disabled={busy} onClick={() => beginUtilisation(member)}>Record benefit use</button>
+                </ActionMenu>
+              </td>
             </tr>)}</tbody>
           </table>
           {!members.items.length && <div className="empty"><strong>No medical members found</strong>Enrol a customer or adjust the filters.</div>}
@@ -381,7 +355,7 @@ export default function MedicalPage() {
         <div className="card-header"><div><h2>Medical & health-cash claims</h2><p>Controlled claims workflow separate from general insurance claims.</p></div></div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Claim</th><th>Member</th><th>Type / provider</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Claim</th><th>Member</th><th>Type / provider</th><th>Amount</th><th>Status</th><th aria-label="Actions" /></tr></thead>
             <tbody>{claims.map((claim) => {
               const member = memberMap.get(claim.member_id);
               return <tr key={claim.id}>
@@ -390,13 +364,104 @@ export default function MedicalPage() {
                 <td><div className="cell-title">{claim.claim_kind.replaceAll("_", " ")}</div><div className="cell-sub">{claim.provider_name || "No provider"}</div></td>
                 <td className="money">LSL {Number(claim.claim_amount).toLocaleString()}</td>
                 <td><span className={`badge ${claim.status}`}>{claim.status}</span></td>
-                <td><div className="actions">{(claimTransitions[claim.status] || []).map((next) => <button key={next} className={next === "declined" ? "button danger small" : "button secondary small"} disabled={busy} onClick={() => changeClaimStatus(claim, next)}>{next}</button>)}</div></td>
+                <td>
+                  <ActionMenu label={`Actions for ${claim.claim_number}`}>
+                    {(claimTransitions[claim.status] || []).map((next) => <button type="button" key={next} className={next === "declined" ? "action-menu-item danger" : "action-menu-item"} disabled={busy} onClick={() => beginClaimStatus(claim, next)}>Move to {next}</button>)}
+                    {!claimTransitions[claim.status]?.length && <button type="button" className="action-menu-item" disabled>No workflow action available</button>}
+                  </ActionMenu>
+                </td>
               </tr>;
             })}</tbody>
           </table>
           {!claims.length && <div className="empty"><strong>No medical claims yet</strong>Medical and health-cash claims will appear here.</div>}
         </div>
       </section>
+
+      <SmartDialog open={showPlanForm} onClose={() => { if (!busy) setShowPlanForm(false); }} title="Create medical plan" description="Create the plan shell first, then configure its approved benefits and limits." size="md">
+        <form className="card pad" onSubmit={createPlan}>
+          <div className="form-grid">
+            <div className="field"><label>Code</label><input className="input" value={planForm.code} onChange={(e) => setPlanForm({ ...planForm, code: e.target.value })} required /></div>
+            <div className="field"><label>Plan name</label><input className="input" value={planForm.name} onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })} required /></div>
+            <div className="field"><label>Monthly premium (LSL)</label><input className="input" type="number" min="0" step="0.01" value={planForm.monthly_premium} onChange={(e) => setPlanForm({ ...planForm, monthly_premium: e.target.value })} /></div>
+            <div className="field full"><label>Description</label><textarea className="textarea" value={planForm.description} onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })} /></div>
+          </div>
+          <div className="form-actions"><button type="button" className="button secondary" onClick={() => setShowPlanForm(false)} disabled={busy}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Create plan"}</button></div>
+        </form>
+      </SmartDialog>
+
+      <SmartDialog open={showMemberForm} onClose={() => { if (!busy) setShowMemberForm(false); }} title="Enrol medical member" description="Link a customer to an active medical plan and define the cover period." size="md">
+        <form className="card pad" onSubmit={createMember}>
+          <div className="form-grid">
+            <div className="field full"><label>Customer</label><select className="select" value={memberForm.customer_id} onChange={(e) => setMemberForm({ ...memberForm, customer_id: e.target.value })} required><option value="">Select customer</option>{customers.items.map((customer) => <option key={customer.id} value={customer.id}>{customer.customer_number} · {customer.display_name}</option>)}</select></div>
+            <div className="field"><label>Medical plan</label><select className="select" value={memberForm.plan_id} onChange={(e) => setMemberForm({ ...memberForm, plan_id: e.target.value })} required><option value="">Select plan</option>{plans.filter((plan) => plan.is_active).map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}</select></div>
+            <div className="field"><label>Start date</label><input className="input" type="date" value={memberForm.start_date} onChange={(e) => setMemberForm({ ...memberForm, start_date: e.target.value })} required /></div>
+            <div className="field"><label>End date (optional)</label><input className="input" type="date" value={memberForm.end_date} onChange={(e) => setMemberForm({ ...memberForm, end_date: e.target.value })} /></div>
+          </div>
+          <div className="form-actions"><button type="button" className="button secondary" onClick={() => setShowMemberForm(false)} disabled={busy}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Enrol member"}</button></div>
+        </form>
+      </SmartDialog>
+
+      <SmartDialog open={showClaimForm} onClose={() => { if (!busy) setShowClaimForm(false); }} title="Register medical / health-cash claim" description="Capture the service details and route the claim through the dedicated medical workflow." size="lg">
+        <form className="card pad" onSubmit={createClaim}>
+          <div className="form-grid">
+            <div className="field full"><label>Member</label><select className="select" value={claimForm.member_id} onChange={(e) => setClaimForm({ ...claimForm, member_id: e.target.value })} required><option value="">Select member</option>{members.items.map((member) => <option key={member.id} value={member.id}>{member.member_number} · {customerMap.get(member.customer_id) || "Customer"}</option>)}</select></div>
+            <div className="field"><label>Claim kind</label><select className="select" value={claimForm.claim_kind} onChange={(e) => setClaimForm({ ...claimForm, claim_kind: e.target.value })}><option value="medical">Medical</option><option value="cash_plan">Health cash plan</option></select></div>
+            <div className="field"><label>Service date</label><input className="input" type="date" value={claimForm.service_date} onChange={(e) => setClaimForm({ ...claimForm, service_date: e.target.value })} required /></div>
+            <div className="field"><label>Admission date</label><input className="input" type="date" value={claimForm.admission_date} onChange={(e) => setClaimForm({ ...claimForm, admission_date: e.target.value })} required={claimForm.claim_kind === "cash_plan"} /></div>
+            <div className="field"><label>Discharge date</label><input className="input" type="date" value={claimForm.discharge_date} onChange={(e) => setClaimForm({ ...claimForm, discharge_date: e.target.value })} required={claimForm.claim_kind === "cash_plan"} /></div>
+            <div className="field"><label>Claim amount</label><input className="input" type="number" min="0" step="0.01" value={claimForm.claim_amount} onChange={(e) => setClaimForm({ ...claimForm, claim_amount: e.target.value })} required /></div>
+            <div className="field"><label>Provider</label><input className="input" value={claimForm.provider_name} onChange={(e) => setClaimForm({ ...claimForm, provider_name: e.target.value })} /></div>
+            <div className="field full"><label>Description</label><textarea className="textarea" value={claimForm.description} onChange={(e) => setClaimForm({ ...claimForm, description: e.target.value })} /></div>
+          </div>
+          <div className="form-actions"><button type="button" className="button secondary" onClick={() => setShowClaimForm(false)} disabled={busy}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Register claim"}</button></div>
+        </form>
+      </SmartDialog>
+
+      <SmartDialog open={Boolean(benefitTarget)} onClose={() => { if (!busy) setBenefitTarget(null); }} title={benefitTarget ? `Add benefit to ${benefitTarget.name}` : "Add benefit"} description="Configure benefit limits without hard-coding brochure values into the application." size="md">
+        <form className="card pad" onSubmit={createBenefit}>
+          <div className="form-grid">
+            <div className="field"><label>Benefit code</label><input className="input" value={benefitForm.code} onChange={(e) => setBenefitForm({ ...benefitForm, code: e.target.value })} required /></div>
+            <div className="field"><label>Benefit name</label><input className="input" value={benefitForm.name} onChange={(e) => setBenefitForm({ ...benefitForm, name: e.target.value })} required /></div>
+            <div className="field"><label>Category</label><input className="input" value={benefitForm.category} onChange={(e) => setBenefitForm({ ...benefitForm, category: e.target.value })} required /></div>
+            <div className="field"><label>Annual visit limit</label><input className="input" type="number" min="0" step="1" value={benefitForm.annual_visit_limit} onChange={(e) => setBenefitForm({ ...benefitForm, annual_visit_limit: e.target.value })} /></div>
+            <div className="field"><label>Annual monetary limit (LSL)</label><input className="input" type="number" min="0" step="0.01" value={benefitForm.annual_monetary_limit} onChange={(e) => setBenefitForm({ ...benefitForm, annual_monetary_limit: e.target.value })} /></div>
+            <div className="field"><label>Per-event limit (LSL)</label><input className="input" type="number" min="0" step="0.01" value={benefitForm.per_event_limit} onChange={(e) => setBenefitForm({ ...benefitForm, per_event_limit: e.target.value })} /></div>
+            <label className="field full" style={{ display: "flex", gridTemplateColumns: "auto 1fr", alignItems: "center" }}><input type="checkbox" checked={benefitForm.requires_authorisation} onChange={(e) => setBenefitForm({ ...benefitForm, requires_authorisation: e.target.checked })} /> <span>Prior authorisation required</span></label>
+          </div>
+          <div className="form-actions"><button type="button" className="button secondary" onClick={() => setBenefitTarget(null)} disabled={busy}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Add benefit"}</button></div>
+        </form>
+      </SmartDialog>
+
+      <SmartDialog open={Boolean(dependantTarget)} onClose={() => { if (!busy) setDependantTarget(null); }} title={dependantTarget ? `Add dependant to ${dependantTarget.member_number}` : "Add dependant"} description="Capture dependant details against the selected medical membership." size="sm">
+        <form className="card pad" onSubmit={createDependant}>
+          <div className="form-grid">
+            <div className="field"><label>First name</label><input className="input" value={dependantForm.first_name} onChange={(e) => setDependantForm({ ...dependantForm, first_name: e.target.value })} required /></div>
+            <div className="field"><label>Last name</label><input className="input" value={dependantForm.last_name} onChange={(e) => setDependantForm({ ...dependantForm, last_name: e.target.value })} required /></div>
+            <div className="field"><label>Relationship</label><select className="select" value={dependantForm.relationship_type} onChange={(e) => setDependantForm({ ...dependantForm, relationship_type: e.target.value })}><option value="child">Child</option><option value="spouse">Spouse</option><option value="parent">Parent</option><option value="other">Other</option></select></div>
+            <div className="field"><label>Date of birth</label><input className="input" type="date" value={dependantForm.date_of_birth} onChange={(e) => setDependantForm({ ...dependantForm, date_of_birth: e.target.value })} /></div>
+          </div>
+          <div className="form-actions"><button type="button" className="button secondary" onClick={() => setDependantTarget(null)} disabled={busy}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Add dependant"}</button></div>
+        </form>
+      </SmartDialog>
+
+      <SmartDialog open={Boolean(utilisationTarget)} onClose={() => { if (!busy) setUtilisationTarget(null); }} title={utilisationTarget ? `Record benefit use · ${utilisationTarget.member_number}` : "Record benefit use"} description="Choose a configured plan benefit and record the amount, units and provider." size="md">
+        <form className="card pad" onSubmit={createUtilisation}>
+          <div className="form-grid">
+            <div className="field full"><label>Benefit</label><select className="select" value={utilisationForm.benefit_id} onChange={(e) => setUtilisationForm({ ...utilisationForm, benefit_id: e.target.value })} required><option value="">Select benefit</option>{(utilisationPlan?.benefits || []).map((benefit) => <option key={benefit.id} value={benefit.id}>{benefit.code} · {benefit.name}</option>)}</select></div>
+            <div className="field"><label>Amount used (LSL)</label><input className="input" type="number" min="0" step="0.01" value={utilisationForm.amount} onChange={(e) => setUtilisationForm({ ...utilisationForm, amount: e.target.value })} required /></div>
+            <div className="field"><label>Visits / units</label><input className="input" type="number" min="1" step="1" value={utilisationForm.units} onChange={(e) => setUtilisationForm({ ...utilisationForm, units: e.target.value })} required /></div>
+            <div className="field full"><label>Provider</label><input className="input" value={utilisationForm.provider_name} onChange={(e) => setUtilisationForm({ ...utilisationForm, provider_name: e.target.value })} /></div>
+          </div>
+          <div className="form-actions"><button type="button" className="button secondary" onClick={() => setUtilisationTarget(null)} disabled={busy}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Record use"}</button></div>
+        </form>
+      </SmartDialog>
+
+      <SmartDialog open={Boolean(claimWorkflow)} onClose={() => { if (!busy) setClaimWorkflow(null); }} title={claimWorkflow ? `Move ${claimWorkflow.claim.claim_number} to ${claimWorkflow.next}` : "Update medical claim"} description="Confirm the next controlled stage in the medical claims workflow." size="sm">
+        <form className="card pad" onSubmit={submitClaimStatus}>
+          {claimWorkflow?.next === "approved" && <div className="field"><label>Approved amount</label><input className="input" type="number" min="0" step="0.01" required value={approvedAmount} onChange={(e) => setApprovedAmount(e.target.value)} /></div>}
+          <div className="form-actions"><button type="button" className="button secondary" onClick={() => setClaimWorkflow(null)} disabled={busy}>Cancel</button><button className={claimWorkflow?.next === "declined" ? "button danger" : "button"} disabled={busy}>{busy ? "Updating…" : "Confirm transition"}</button></div>
+        </form>
+      </SmartDialog>
     </AppShell>
   );
 }

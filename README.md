@@ -50,9 +50,11 @@ Repository layout:
 apps/web                 Next.js frontend/BFF
 apps/api                 FastAPI backend, Alembic migrations and tests
 docker-compose.yml       local/development stack
+docker-compose.local.yml local test override with guarded default administrator
 docker-compose.prod.yml  production stack
-DEPLOYMENT.md            production runbook
-Caddyfile.example        same-origin HTTPS/WebSocket routing example
+LOCAL_TEST.md             local test runbook
+DEPLOYMENT.md             production runbook
+Caddyfile.example         same-origin HTTPS/WebSocket routing example
 ```
 
 The browser never receives PostgreSQL/Redis credentials and no FastAPI bearer token is stored in browser `localStorage` or `sessionStorage`. Business rules remain in FastAPI.
@@ -124,6 +126,15 @@ Services:
 - Web health: `http://localhost:8080/api/health`
 
 Docker Compose runs an explicit one-shot `migrate` service before FastAPI starts.
+
+For a repeatable full local test with the guarded default administrator, use the separate local override:
+
+```bash
+cp .env.example .env
+bash scripts/local-test.sh
+```
+
+See `LOCAL_TEST.md` for the local test login, health checks, reset procedure and safety notes. The plaintext local test password is intentionally not committed to Git.
 
 ## Bootstrap the first administrator
 
