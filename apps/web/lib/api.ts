@@ -29,10 +29,21 @@ async function readError(response: Response): Promise<string> {
   return text;
 }
 
-export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers);
+function authenticatedHeaders(initial?: HeadersInit): Headers {
+  const headers = new Headers(initial);
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  return headers;
+}
+
+async function handleUnauthorized(response: Response): Promise<void> {
+  if (response.status !== 401) return;
+  clearToken();
+  if (typeof window !== "undefined") window.location.assign("/login");
+}
+
+export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = authenticatedHeaders(init.headers);
   if (init.body && !(init.body instanceof FormData) && !(init.body instanceof URLSearchParams)) {
     headers.set("Content-Type", "application/json");
   }
@@ -40,10 +51,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   const response = await fetch(proxyUrl(path), { ...init, headers, cache: "no-store" });
   if (!response.ok) {
     const message = await readError(response);
-    if (response.status === 401) {
-      clearToken();
-      if (typeof window !== "undefined") window.location.assign("/login");
-    }
+    await handleUnauthorized(response);
     throw new ApiError(message, response.status);
   }
   if (response.status === 204) return undefined as T;
@@ -60,6 +68,27 @@ export function apiPost<T>(path: string, payload: unknown): Promise<T> {
 
 export function apiPatch<T>(path: string, payload: unknown): Promise<T> {
   return apiRequest<T>(path, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  return apiRequest<T>(path, { method: "POST", body: form });
+}
+
+export async function apiDownload(path: string): Promise<{ blob: Blob; filename: string | null }> {
+  const response = await fetch(proxyUrl(path), {
+    method: "GET",
+    headers: authenticatedHeaders(),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const message = await readError(response);
+    await handleUnauthorized(response);
+    throw new ApiError(message, response.status);
+  }
+  const disposition = response.headers.get("content-disposition");
+  const filenameMatch = disposition?.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
+  const filename = filenameMatch ? decodeURIComponent(filenameMatch[1].replace(/^\"|\"$/g, "")) : null;
+  return { blob: await response.blob(), filename };
 }
 
 export async function login(email: string, password: string): Promise<{ access_token: string }> {
