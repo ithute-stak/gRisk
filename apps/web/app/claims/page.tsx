@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { ActionMenu, SmartDialog } from "@/components/SmartUi";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import type { Claim, ClaimEvent, ClaimList, CustomerList, Policy } from "@/lib/types";
 
@@ -35,6 +36,11 @@ export default function ClaimsPage() {
   const [priority, setPriority] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [workflowTarget, setWorkflowTarget] = useState<{ claim: Claim; next: string } | null>(null);
+  const [workflowNote, setWorkflowNote] = useState("");
+  const [approvedAmount, setApprovedAmount] = useState("");
+  const [noteTarget, setNoteTarget] = useState<Claim | null>(null);
+  const [noteText, setNoteText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -86,22 +92,29 @@ export default function ClaimsPage() {
     }
   }
 
-  async function changeStatus(claim: Claim, next: string) {
-    const note = window.prompt(`Optional note for ${claim.claim_number}:`) || undefined;
-    let approvedAmount: string | undefined;
-    if (next === "approved") {
-      const value = window.prompt(`Approved amount (claim amount ${claim.claim_amount}):`, claim.claim_amount);
-      if (value === null || value.trim() === "") return;
-      approvedAmount = value.trim();
-    }
+  function beginStatusChange(claim: Claim, next: string) {
+    setWorkflowTarget({ claim, next });
+    setWorkflowNote("");
+    setApprovedAmount(next === "approved" ? claim.claim_amount : "");
+  }
+
+  async function submitStatusChange(event: FormEvent) {
+    event.preventDefault();
+    if (!workflowTarget) return;
+    const { claim, next } = workflowTarget;
+    if (next === "approved" && !approvedAmount.trim()) return;
+
     setBusy(true);
     setError("");
     try {
       await apiPatch<Claim>(`/api/v1/claims/${claim.id}/status`, {
         status: next,
-        note,
-        approved_amount: approvedAmount,
+        note: workflowNote.trim() || undefined,
+        approved_amount: next === "approved" ? approvedAmount.trim() : undefined,
       });
+      setWorkflowTarget(null);
+      setWorkflowNote("");
+      setApprovedAmount("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to update claim status.");
@@ -110,13 +123,15 @@ export default function ClaimsPage() {
     }
   }
 
-  async function addNote(claim: Claim) {
-    const note = window.prompt(`Add internal note to ${claim.claim_number}:`);
-    if (!note?.trim()) return;
+  async function submitNote(event: FormEvent) {
+    event.preventDefault();
+    if (!noteTarget || !noteText.trim()) return;
     setBusy(true);
     setError("");
     try {
-      await apiPost<ClaimEvent>(`/api/v1/claims/${claim.id}/notes`, { note: note.trim() });
+      await apiPost<ClaimEvent>(`/api/v1/claims/${noteTarget.id}/notes`, { note: noteText.trim() });
+      setNoteTarget(null);
+      setNoteText("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to add note.");
@@ -133,7 +148,7 @@ export default function ClaimsPage() {
     <AppShell>
       <div className="page-head">
         <div><h1>Claims</h1><p>Register claims against active policies, then manage triage, assessment, insurer review, approval and settlement.</p></div>
-        <div className="page-actions"><button className="button" onClick={() => setShowForm((value) => !value)}>{showForm ? "Close form" : "Register claim"}</button></div>
+        <div className="page-actions"><button className="button" onClick={() => setShowForm(true)}>Register claim</button></div>
       </div>
 
       {error && <div className="notice error" style={{ marginBottom: 16 }}>{error}</div>}
@@ -145,21 +160,6 @@ export default function ClaimsPage() {
         <div className="card metric"><div className="label">Claimed value</div><div className="value" style={{ fontSize: "1.35rem" }}>LSL {totalClaimed.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div><div className="hint">Filtered claims</div></div>
       </section>
 
-      {showForm && (
-        <form className="card pad" onSubmit={createClaim} style={{ marginBottom: 18 }}>
-          <div className="card-header" style={{ padding: 0, paddingBottom: 16, marginBottom: 16 }}><h2>Register claim</h2></div>
-          <div className="form-grid">
-            <div className="field full"><label>Policy</label><select className="select" value={form.policy_id} onChange={(e) => setForm({ ...form, policy_id: e.target.value })} required><option value="">Select policy</option>{policies.map((policy) => <option key={policy.id} value={policy.id}>{policy.policy_number} · {customerMap.get(policy.customer_id) || "Customer"} · {policy.currency} {Number(policy.sum_insured).toLocaleString()}</option>)}</select></div>
-            <div className="field"><label>Claim type</label><input className="input" value={form.claim_type} onChange={(e) => setForm({ ...form, claim_type: e.target.value })} required /></div>
-            <div className="field"><label>Priority</label><select className="select" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="critical">Critical</option></select></div>
-            <div className="field"><label>Incident date</label><input className="input" type="date" value={form.incident_date} onChange={(e) => setForm({ ...form, incident_date: e.target.value })} required /></div>
-            <div className="field"><label>Claim amount</label><input className="input" type="number" min="0" step="0.01" value={form.claim_amount} onChange={(e) => setForm({ ...form, claim_amount: e.target.value })} required /></div>
-            <div className="field full"><label>Description</label><textarea className="textarea" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} minLength={5} required /></div>
-          </div>
-          <div className="form-actions"><button className="button secondary" type="button" onClick={() => setShowForm(false)}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Register claim"}</button></div>
-        </form>
-      )}
-
       <section className="card">
         <div className="toolbar">
           <input className="input search" placeholder="Search claim number or description…" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -168,7 +168,7 @@ export default function ClaimsPage() {
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Claim</th><th>Policy / customer</th><th>Incident</th><th>Amount</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Claim</th><th>Policy / customer</th><th>Incident</th><th>Amount</th><th>Priority</th><th>Status</th><th aria-label="Actions" /></tr></thead>
             <tbody>{claims.items.map((claim) => {
               const policy = policyMap.get(claim.policy_id);
               return (
@@ -179,7 +179,23 @@ export default function ClaimsPage() {
                   <td className="money">LSL {Number(claim.claim_amount).toLocaleString()}</td>
                   <td><span className={`badge ${claim.priority}`}>{claim.priority}</span></td>
                   <td><span className={`badge ${claim.status}`}>{claim.status.replaceAll("_", " ")}</span></td>
-                  <td><div className="actions"><button className="button ghost small" disabled={busy} onClick={() => addNote(claim)}>Add note</button>{(transitions[claim.status] || []).map((next) => <button key={next} className={next === "rejected" ? "button danger small" : "button secondary small"} disabled={busy} onClick={() => changeStatus(claim, next)}>{next.replaceAll("_", " ")}</button>)}</div></td>
+                  <td>
+                    <ActionMenu label={`Actions for ${claim.claim_number}`}>
+                      <button type="button" className="action-menu-item" disabled={busy} onClick={() => { setNoteTarget(claim); setNoteText(""); }}>Add internal note</button>
+                      {(transitions[claim.status] || []).map((next) => (
+                        <button
+                          type="button"
+                          key={next}
+                          className={next === "rejected" ? "action-menu-item danger" : "action-menu-item"}
+                          disabled={busy}
+                          onClick={() => beginStatusChange(claim, next)}
+                        >
+                          Move to {next.replaceAll("_", " ")}
+                        </button>
+                      ))}
+                      {!transitions[claim.status]?.length && <button type="button" className="action-menu-item" disabled>No workflow action available</button>}
+                    </ActionMenu>
+                  </td>
                 </tr>
               );
             })}</tbody>
@@ -187,6 +203,57 @@ export default function ClaimsPage() {
           {!claims.items.length && <div className="empty"><strong>No claims found</strong>Register a claim or adjust the current filters.</div>}
         </div>
       </section>
+
+      <SmartDialog
+        open={showForm}
+        onClose={() => { if (!busy) setShowForm(false); }}
+        title="Register claim"
+        description="Link the claim to an active policy and capture the incident, priority and claimed amount."
+        size="lg"
+      >
+        <form className="card pad" onSubmit={createClaim}>
+          <div className="form-grid">
+            <div className="field full"><label>Policy</label><select className="select" value={form.policy_id} onChange={(e) => setForm({ ...form, policy_id: e.target.value })} required><option value="">Select policy</option>{policies.map((policy) => <option key={policy.id} value={policy.id}>{policy.policy_number} · {customerMap.get(policy.customer_id) || "Customer"} · {policy.currency} {Number(policy.sum_insured).toLocaleString()}</option>)}</select></div>
+            <div className="field"><label>Claim type</label><input className="input" value={form.claim_type} onChange={(e) => setForm({ ...form, claim_type: e.target.value })} required /></div>
+            <div className="field"><label>Priority</label><select className="select" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="critical">Critical</option></select></div>
+            <div className="field"><label>Incident date</label><input className="input" type="date" value={form.incident_date} onChange={(e) => setForm({ ...form, incident_date: e.target.value })} required /></div>
+            <div className="field"><label>Claim amount</label><input className="input" type="number" min="0" step="0.01" value={form.claim_amount} onChange={(e) => setForm({ ...form, claim_amount: e.target.value })} required /></div>
+            <div className="field full"><label>Description</label><textarea className="textarea" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} minLength={5} required /></div>
+          </div>
+          <div className="form-actions"><button className="button secondary" type="button" onClick={() => setShowForm(false)} disabled={busy}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Register claim"}</button></div>
+        </form>
+      </SmartDialog>
+
+      <SmartDialog
+        open={Boolean(workflowTarget)}
+        onClose={() => { if (!busy) setWorkflowTarget(null); }}
+        title={workflowTarget ? `Move ${workflowTarget.claim.claim_number} to ${workflowTarget.next.replaceAll("_", " ")}` : "Update claim"}
+        description="Confirm the controlled workflow transition and record a note when useful for the audit trail."
+        size="sm"
+      >
+        <form className="card pad" onSubmit={submitStatusChange}>
+          <div className="form-grid">
+            {workflowTarget?.next === "approved" && (
+              <div className="field full"><label>Approved amount</label><input className="input" type="number" min="0" step="0.01" required value={approvedAmount} onChange={(e) => setApprovedAmount(e.target.value)} /></div>
+            )}
+            <div className="field full"><label>Internal note <span className="muted">(optional)</span></label><textarea className="textarea" value={workflowNote} onChange={(e) => setWorkflowNote(e.target.value)} placeholder="Reason, context or follow-up details…" /></div>
+          </div>
+          <div className="form-actions"><button className="button secondary" type="button" onClick={() => setWorkflowTarget(null)} disabled={busy}>Cancel</button><button className={workflowTarget?.next === "rejected" ? "button danger" : "button"} disabled={busy}>{busy ? "Updating…" : "Confirm transition"}</button></div>
+        </form>
+      </SmartDialog>
+
+      <SmartDialog
+        open={Boolean(noteTarget)}
+        onClose={() => { if (!busy) setNoteTarget(null); }}
+        title={noteTarget ? `Add note to ${noteTarget.claim_number}` : "Add claim note"}
+        description="Internal notes are recorded against the claim timeline for operational continuity."
+        size="sm"
+      >
+        <form className="card pad" onSubmit={submitNote}>
+          <div className="field"><label>Internal note</label><textarea className="textarea" value={noteText} onChange={(e) => setNoteText(e.target.value)} minLength={1} required autoFocus placeholder="Add the operational note…" /></div>
+          <div className="form-actions"><button className="button secondary" type="button" onClick={() => setNoteTarget(null)} disabled={busy}>Cancel</button><button className="button" disabled={busy || !noteText.trim()}>{busy ? "Saving…" : "Save note"}</button></div>
+        </form>
+      </SmartDialog>
     </AppShell>
   );
 }

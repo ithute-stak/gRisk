@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { ActionMenu, SmartDialog } from "@/components/SmartUi";
 import { apiGet, apiPost } from "@/lib/api";
 import type { CustomerList, CustomerSummary } from "@/lib/types";
 
@@ -65,18 +66,61 @@ export default function CustomersPage() {
     }
   }
 
+  function copyValue(value?: string | null) {
+    if (!value || !navigator.clipboard) return;
+    void navigator.clipboard.writeText(value);
+  }
+
   return (
     <AppShell>
       <div className="page-head">
         <div><h1>Customers</h1><p>Manage individual and company customer records used across quotations, policies and claims.</p></div>
-        <div className="page-actions"><button className="button" onClick={() => setShowForm((value) => !value)}>{showForm ? "Close form" : "New customer"}</button></div>
+        <div className="page-actions"><button className="button" onClick={() => setShowForm(true)}>New customer</button></div>
       </div>
 
       {error && <div className="notice error" style={{ marginBottom: 16 }}>{error}</div>}
 
-      {showForm && (
-        <form className="card pad" onSubmit={createCustomer} style={{ marginBottom: 18 }}>
-          <div className="card-header" style={{ padding: 0, paddingBottom: 16, marginBottom: 16 }}><h2>Create customer</h2></div>
+      <section className="card">
+        <div className="toolbar">
+          <input className="input search" placeholder="Search name, customer number, email, phone…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <select className="select" style={{ width: 160 }} value={type} onChange={(e) => setType(e.target.value)}><option value="">All types</option><option value="individual">Individuals</option><option value="company">Companies</option></select>
+          <select className="select" style={{ width: 160 }} value={status} onChange={(e) => setStatus(e.target.value)}><option value="">All statuses</option><option value="active">Active</option><option value="prospect">Prospect</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option></select>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Customer</th><th>Number</th><th>Type</th><th>Contact</th><th>Status</th><th>Created</th><th aria-label="Actions" /></tr></thead>
+            <tbody>
+              {data.items.map((customer) => (
+                <tr key={customer.id}>
+                  <td><div className="cell-title">{customer.display_name}</div><div className="cell-sub">{customer.email || "No email"}</div></td>
+                  <td>{customer.customer_number}</td>
+                  <td><span className="badge">{customer.customer_type}</span></td>
+                  <td>{customer.phone || "—"}</td>
+                  <td><span className={`badge ${customer.status}`}>{customer.status}</span></td>
+                  <td>{new Date(customer.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <ActionMenu label={`Actions for ${customer.display_name}`}>
+                      <button type="button" className="action-menu-item" disabled={!customer.email} onClick={() => copyValue(customer.email)}>Copy email</button>
+                      <button type="button" className="action-menu-item" disabled={!customer.phone} onClick={() => copyValue(customer.phone)}>Copy phone</button>
+                      <button type="button" className="action-menu-item" onClick={() => copyValue(customer.customer_number)}>Copy customer number</button>
+                    </ActionMenu>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!data.items.length && <div className="empty"><strong>No customers found</strong>Adjust the filters or create a new customer.</div>}
+        </div>
+      </section>
+
+      <SmartDialog
+        open={showForm}
+        onClose={() => { if (!busy) setShowForm(false); }}
+        title="Create customer"
+        description="Add the customer once and reuse the record across quotations, policies, claims and finance."
+        size="md"
+      >
+        <form className="card pad" onSubmit={createCustomer}>
           <div className="form-grid">
             <div className="field"><label>Customer type</label><select className="select" value={form.customer_type} onChange={(e) => setForm({ ...form, customer_type: e.target.value })}><option value="individual">Individual</option><option value="company">Company</option></select></div>
             <div className="field"><label>Status</label><select className="select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="active">Active</option><option value="prospect">Prospect</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option></select></div>
@@ -88,35 +132,9 @@ export default function CustomersPage() {
             <div className="field"><label>Email</label><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
             <div className="field"><label>Phone</label><input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
           </div>
-          <div className="form-actions"><button className="button secondary" type="button" onClick={() => setShowForm(false)}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Create customer"}</button></div>
+          <div className="form-actions"><button className="button secondary" type="button" onClick={() => setShowForm(false)} disabled={busy}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Create customer"}</button></div>
         </form>
-      )}
-
-      <section className="card">
-        <div className="toolbar">
-          <input className="input search" placeholder="Search name, customer number, email, phone…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <select className="select" style={{ width: 160 }} value={type} onChange={(e) => setType(e.target.value)}><option value="">All types</option><option value="individual">Individuals</option><option value="company">Companies</option></select>
-          <select className="select" style={{ width: 160 }} value={status} onChange={(e) => setStatus(e.target.value)}><option value="">All statuses</option><option value="active">Active</option><option value="prospect">Prospect</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option></select>
-        </div>
-        <div className="table-wrap">
-          <table>
-            <thead><tr><th>Customer</th><th>Number</th><th>Type</th><th>Contact</th><th>Status</th><th>Created</th></tr></thead>
-            <tbody>
-              {data.items.map((customer) => (
-                <tr key={customer.id}>
-                  <td><div className="cell-title">{customer.display_name}</div><div className="cell-sub">{customer.email || "No email"}</div></td>
-                  <td>{customer.customer_number}</td>
-                  <td><span className="badge">{customer.customer_type}</span></td>
-                  <td>{customer.phone || "—"}</td>
-                  <td><span className={`badge ${customer.status}`}>{customer.status}</span></td>
-                  <td>{new Date(customer.created_at).toLocaleDateString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!data.items.length && <div className="empty"><strong>No customers found</strong>Adjust the filters or create a new customer.</div>}
-        </div>
-      </section>
+      </SmartDialog>
     </AppShell>
   );
 }

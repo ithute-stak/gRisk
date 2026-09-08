@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { ActionMenu, SmartDialog } from "@/components/SmartUi";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import type { CustomerList, InsuranceProduct, Policy, Quote, QuoteList } from "@/lib/types";
 
@@ -121,14 +122,71 @@ export default function QuotationsPage() {
     <AppShell>
       <div className="page-head">
         <div><h1>Quotations</h1><p>Create insurance quotations and move them through controlled review, submission and acceptance before policy issuance.</p></div>
-        <div className="page-actions"><button className="button" onClick={() => setShowForm((value) => !value)}>{showForm ? "Close form" : "New quotation"}</button></div>
+        <div className="page-actions"><button className="button" onClick={() => setShowForm(true)}>New quotation</button></div>
       </div>
 
       {error && <div className="notice error" style={{ marginBottom: 16 }}>{error}</div>}
 
-      {showForm && (
-        <form className="card pad" onSubmit={createQuote} style={{ marginBottom: 18 }}>
-          <div className="card-header" style={{ padding: 0, paddingBottom: 16, marginBottom: 16 }}><h2>Create quotation</h2></div>
+      <section className="card">
+        <div className="toolbar">
+          <input className="input search" placeholder="Search quotation number…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <select className="select" style={{ width: 180 }} value={status} onChange={(e) => setStatus(e.target.value)}><option value="">All statuses</option>{["draft","review","submitted","accepted","declined","expired","converted"].map((item) => <option key={item}>{item}</option>)}</select>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Quotation</th><th>Customer</th><th>Product</th><th>Sum insured</th><th>Premium</th><th>Status</th><th aria-label="Actions" /></tr></thead>
+            <tbody>{quotes.items.map((quote) => (
+              <tr key={quote.id}>
+                <td><div className="cell-title">{quote.quote_number}</div><div className="cell-sub">{new Date(quote.created_at).toLocaleDateString()}</div></td>
+                <td>{customerMap.get(quote.customer_id) || quote.customer_id.slice(0, 8)}</td>
+                <td>{productMap.get(quote.product_id) || quote.product_id.slice(0, 8)}</td>
+                <td className="money">{quote.currency} {Number(quote.sum_insured).toLocaleString()}</td>
+                <td className="money">{quote.currency} {Number(quote.premium).toLocaleString()}</td>
+                <td><span className={`badge ${quote.status}`}>{quote.status}</span></td>
+                <td>
+                  <ActionMenu label={`Actions for ${quote.quote_number}`}>
+                    {(nextStatus[quote.status] || []).map((next) => (
+                      <button
+                        type="button"
+                        key={next}
+                        className={next === "declined" ? "action-menu-item danger" : "action-menu-item"}
+                        disabled={busy}
+                        onClick={() => changeStatus(quote, next)}
+                      >
+                        Move to {next}
+                      </button>
+                    ))}
+                    {quote.status === "accepted" && (
+                      <button
+                        type="button"
+                        className="action-menu-item"
+                        disabled={busy}
+                        onClick={() => {
+                          setConvertQuote(quote);
+                          setConvertDates({ start_date: quote.start_date || "", end_date: quote.end_date || "" });
+                        }}
+                      >
+                        Issue policy <span aria-hidden="true">→</span>
+                      </button>
+                    )}
+                    {!nextStatus[quote.status]?.length && quote.status !== "accepted" && <button type="button" className="action-menu-item" disabled>No workflow action available</button>}
+                  </ActionMenu>
+                </td>
+              </tr>
+            ))}</tbody>
+          </table>
+          {!quotes.items.length && <div className="empty"><strong>No quotations found</strong>Create a quotation or adjust your filters.</div>}
+        </div>
+      </section>
+
+      <SmartDialog
+        open={showForm}
+        onClose={() => { if (!busy) setShowForm(false); }}
+        title="Create quotation"
+        description="Capture the insured value, premium and cover period, then move the quotation through the controlled review workflow."
+        size="lg"
+      >
+        <form className="card pad" onSubmit={createQuote}>
           <div className="form-grid">
             <div className="field"><label>Customer</label><select className="select" value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value })} required><option value="">Select customer</option>{customers.items.map((item) => <option key={item.id} value={item.id}>{item.display_name} · {item.customer_number}</option>)}</select></div>
             <div className="field"><label>Insurance product</label><select className="select" value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })} required><option value="">Select product</option>{products.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
@@ -140,44 +198,25 @@ export default function QuotationsPage() {
             <div className="field"><label>Cover end</label><input className="input" type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></div>
             <div className="field full"><label>Notes</label><textarea className="textarea" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
           </div>
-          <div className="form-actions"><button className="button secondary" type="button" onClick={() => setShowForm(false)}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Create quotation"}</button></div>
+          <div className="form-actions"><button className="button secondary" type="button" onClick={() => setShowForm(false)} disabled={busy}>Cancel</button><button className="button" disabled={busy}>{busy ? "Saving…" : "Create quotation"}</button></div>
         </form>
-      )}
+      </SmartDialog>
 
-      {convertQuote && (
-        <form className="card pad" onSubmit={issuePolicy} style={{ marginBottom: 18 }}>
-          <div className="card-header" style={{ padding: 0, paddingBottom: 16, marginBottom: 16 }}><h2>Issue policy from {convertQuote.quote_number}</h2></div>
+      <SmartDialog
+        open={Boolean(convertQuote)}
+        onClose={() => { if (!busy) setConvertQuote(null); }}
+        title={convertQuote ? `Issue policy from ${convertQuote.quote_number}` : "Issue policy"}
+        description="Confirm the final policy period. Policy issuance is only available after the quotation has been accepted."
+        size="sm"
+      >
+        <form className="card pad" onSubmit={issuePolicy}>
           <div className="form-grid">
             <div className="field"><label>Policy start date</label><input className="input" type="date" required value={convertDates.start_date} onChange={(e) => setConvertDates({ ...convertDates, start_date: e.target.value })} /></div>
             <div className="field"><label>Policy end date</label><input className="input" type="date" required value={convertDates.end_date} onChange={(e) => setConvertDates({ ...convertDates, end_date: e.target.value })} /></div>
           </div>
-          <div className="form-actions"><button className="button secondary" type="button" onClick={() => setConvertQuote(null)}>Cancel</button><button className="button" disabled={busy}>Issue policy</button></div>
+          <div className="form-actions"><button className="button secondary" type="button" onClick={() => setConvertQuote(null)} disabled={busy}>Cancel</button><button className="button" disabled={busy}>{busy ? "Issuing…" : "Issue policy"}</button></div>
         </form>
-      )}
-
-      <section className="card">
-        <div className="toolbar">
-          <input className="input search" placeholder="Search quotation number…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <select className="select" style={{ width: 180 }} value={status} onChange={(e) => setStatus(e.target.value)}><option value="">All statuses</option>{["draft","review","submitted","accepted","declined","expired","converted"].map((item) => <option key={item}>{item}</option>)}</select>
-        </div>
-        <div className="table-wrap">
-          <table>
-            <thead><tr><th>Quotation</th><th>Customer</th><th>Product</th><th>Sum insured</th><th>Premium</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>{quotes.items.map((quote) => (
-              <tr key={quote.id}>
-                <td><div className="cell-title">{quote.quote_number}</div><div className="cell-sub">{new Date(quote.created_at).toLocaleDateString()}</div></td>
-                <td>{customerMap.get(quote.customer_id) || quote.customer_id.slice(0, 8)}</td>
-                <td>{productMap.get(quote.product_id) || quote.product_id.slice(0, 8)}</td>
-                <td className="money">{quote.currency} {Number(quote.sum_insured).toLocaleString()}</td>
-                <td className="money">{quote.currency} {Number(quote.premium).toLocaleString()}</td>
-                <td><span className={`badge ${quote.status}`}>{quote.status}</span></td>
-                <td><div className="actions">{(nextStatus[quote.status] || []).map((next) => <button key={next} className={next === "declined" ? "button danger small" : "button secondary small"} disabled={busy} onClick={() => changeStatus(quote, next)}>{next}</button>)}{quote.status === "accepted" && <button className="button small" disabled={busy} onClick={() => { setConvertQuote(quote); setConvertDates({ start_date: quote.start_date || "", end_date: quote.end_date || "" }); }}>Issue policy</button>}</div></td>
-              </tr>
-            ))}</tbody>
-          </table>
-          {!quotes.items.length && <div className="empty"><strong>No quotations found</strong>Create a quotation or adjust your filters.</div>}
-        </div>
-      </section>
+      </SmartDialog>
     </AppShell>
   );
 }
