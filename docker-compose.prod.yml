@@ -57,8 +57,8 @@ services:
       GRISK_LOGIN_RATE_LIMIT_WINDOW_SECONDS: ${GRISK_LOGIN_RATE_LIMIT_WINDOW_SECONDS:-300}
       GRISK_DOCUMENT_STORAGE_PATH: /data/documents
       GRISK_DOCUMENT_MAX_UPLOAD_MB: ${GRISK_DOCUMENT_MAX_UPLOAD_MB:-20}
-    expose:
-      - "8000"
+    ports:
+      - "127.0.0.1:${GRISK_API_PORT:-8000}:8000"
     volumes:
       - grisk_documents:/data/documents
     depends_on:
@@ -83,7 +83,7 @@ services:
       API_BASE_URL: http://api:8000
       GRISK_COOKIE_SECURE: "true"
     ports:
-      - "${GRISK_WEB_PORT:-8080}:3000"
+      - "127.0.0.1:${GRISK_WEB_PORT:-8080}:3000"
     depends_on:
       api:
         condition: service_healthy
