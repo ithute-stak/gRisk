@@ -1,110 +1,152 @@
 # gRisk
 
-Guardrisk operating platform built with **Next.js + FastAPI + PostgreSQL + Redis + WebSockets**.
+gRisk is the Guardrisk operating platform built with **Next.js + FastAPI + PostgreSQL + Redis + WebSockets**.
+
+## Release status
+
+The current release line is **gRisk 1.0**. The core Guardrisk operating modules are implemented:
+
+- authentication, staff roles and audit logging
+- CRM and customer management
+- insurance products, quotations and policies
+- general insurance claims
+- Medical Aid, dependants, benefits, prior authorisations and medical claims
+- Health Cash Plan foundations
+- bonds and guarantees
+- enterprise risk assessments and risk registers
+- finance, invoices and payments
+- notifications and customer portal access
+- management reporting
+- superuser administration
+- operational health, request IDs and structured request logging
+
+Provider-specific insurer, bank/payment, SMS, WhatsApp, email and medical-provider integrations are intentionally not hard-coded. They require confirmed provider APIs and credentials.
 
 ## Architecture
 
-- `apps/web` — Next.js App Router frontend
-- `apps/api` — FastAPI backend and business rules
-- PostgreSQL — system of record
-- Redis — cache, realtime/event infrastructure and background-work foundation
-- Alembic — mandatory PostgreSQL schema and controlled reference-data migrations
-- Docker Compose — local/application stack
-- GitHub Actions — path-filtered backend and frontend validation
-
-The browser talks to FastAPI through the Next.js `/api/proxy/*` route. The Next.js server uses `API_BASE_URL` at runtime, so the frontend image does not need an API URL baked into the browser bundle.
-
-## Current delivery status
-
-### Phase 1 — Foundation
-
-Authentication, roles, audit logging, PostgreSQL/Redis connectivity, Docker and CI.
-
-### Phase 2 — CRM
-
-Customer management for individuals and companies, including the backend foundation for contacts, addresses and notes.
-
-### Phase 3 — Insurance quotations and policies
-
-Insurance products, quotation workflow, quote-to-policy conversion, policy register, audit events and realtime events.
-
-### Phase 4 — Claims
-
-In active development on `feature/phase-4-claims`:
-
-- claim registration against a policy
-- policy-cover incident-date validation
-- claim triage and controlled status transitions
-- assessment, insurer review, approval, settlement and closure
-- approved-amount controls
-- internal claim notes and timeline events
-- audit and realtime claim events
-- responsive Next.js claims workspace
-
-## Frontend
-
-The active frontend is Next.js. Blazor is no longer used by Docker or GitHub Actions.
-
-Run it locally:
-
-```bash
-cd apps/web
-npm install
-API_BASE_URL=http://localhost:8000 npm run dev
+```text
+Browser
+  |
+  v
+Next.js 16 / React
+  |  /api/proxy/*
+  v
+FastAPI 1.0 application
+  |-------------------|
+  v                   v
+PostgreSQL           Redis
+(system of record)   cache/rate-limit/realtime foundation
 ```
 
-The Next.js development server listens on `http://localhost:3000`.
+Repository layout:
+
+```text
+apps/web        Next.js frontend
+apps/api        FastAPI backend, Alembic migrations and tests
+docker-compose.yml       local/development stack
+docker-compose.prod.yml  production-oriented stack
+```
+
+The browser does not connect directly to PostgreSQL or Redis. Business rules remain in FastAPI.
+
+## Security model
+
+- passwords are hashed with the configured `pwdlib` Argon2 implementation
+- JWT access tokens are issuer/audience validated
+- inactive users are rejected on authenticated API requests
+- portal-only users cannot access internal operational APIs
+- viewer accounts are read-only
+- operational writes are role-restricted by module
+- superuser administration is separately protected
+- login attempts are rate-limited through Redis
+- production rejects weak JWT secrets, default database credentials, wildcard CORS and non-HTTPS CORS origins
+- API responses receive no-store/security headers and request IDs
+- WebSocket channels require authentication; customer accounts can only subscribe to their own notification channel
+- client WebSocket messages are not rebroadcast into operational channels
+
+Core staff roles seeded by Alembic are `superadmin`, `admin`, `broker`, `claims`, `medical`, `finance`, `risk` and `viewer`.
 
 ## Database migrations
 
-Alembic is mandatory for every PostgreSQL schema change. Do not create, alter or drop application tables manually in production.
+**Alembic is mandatory for every PostgreSQL schema change.** Do not manually alter production application tables.
 
 Current migration chain:
 
-1. `20260907_0001_core_identity`
-2. `20260907_0002_crm_customers`
-3. `20260907_0003_insurance_quotes`
-4. `20260907_0004_seed_general_insurance_products`
-5. `20260907_0005_align_unique_constraints`
-6. `20260907_0006_claims`
+1. `20260907_0001_core_identity.py`
+2. `20260907_0002_crm_customers.py`
+3. `20260907_0003_insurance_quotes.py`
+4. `20260907_0004_seed_general_insurance_products.py`
+5. `20260907_0005_align_unique_indexes.py`
+6. `20260907_0006_claims.py`
+7. `20260908_0007_medical_aid.py`
+8. `20260908_0008_seed_medical_plans.py`
+9. `20260908_0009_align_medical_unique_indexes.py`
+10. `20260908_0010_bonds_risk.py`
+11. `20260908_0011_finance_notifications_portal.py`
 
-Apply migrations from `apps/api`:
+From `apps/api`:
 
 ```bash
 python -m alembic upgrade head
 ```
 
-Backend CI validates:
+CI validates upgrade, model/migration drift, one-step rollback/upgrade and the backend test suite.
+
+## Local development
+
+Copy the example environment file and start the complete stack:
 
 ```bash
-python -m ruff check app tests
-python -m alembic upgrade head
-python -m alembic check
-python -m alembic downgrade -1
-python -m alembic upgrade head
-python -m pytest -q
-```
-
-## GitHub Actions usage
-
-CI is deliberately split to reduce hosted-runner usage:
-
-- backend CI runs only when `apps/api/**` changes
-- Next.js CI runs only when `apps/web/**` changes
-- Docker image validation is manual through `workflow_dispatch`
-- concurrency cancellation stops older runs when a newer commit supersedes them
-
-This keeps expensive .NET restore/build work out of the project and avoids building Docker images on every pull request.
-
-## Docker Compose
-
-```bash
+cp .env.example .env
 docker compose up --build
 ```
 
+Services:
+
 - Web: `http://localhost:8080`
 - API: `http://localhost:8000`
-- API docs: `http://localhost:8000/docs`
+- API docs in non-production: `http://localhost:8000/docs`
+- API readiness: `http://localhost:8000/api/v1/health/ready`
+- Web health: `http://localhost:8080/api/health`
+
+Docker Compose runs an explicit one-shot `migrate` service before FastAPI starts.
+
+## Bootstrap the first administrator
+
+After migrations are applied, set strong temporary bootstrap credentials in your environment and run:
+
+```bash
+docker compose run --rm \
+  -e GRISK_BOOTSTRAP_ADMIN_EMAIL=admin@example.com \
+  -e GRISK_BOOTSTRAP_ADMIN_PASSWORD='replace-with-a-strong-temporary-password' \
+  api python -m app.scripts.bootstrap_admin
+```
+
+The command creates the account only when it does not already exist. Remove bootstrap credentials from the environment after first provisioning.
+
+## Production deployment
+
+Use the production Compose file as the baseline:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production config
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+Production requires explicit PostgreSQL credentials, `GRISK_DATABASE_URL`, a strong `GRISK_SECRET_KEY` and HTTPS CORS origins. PostgreSQL and Redis are not published to host ports by the production Compose file.
+
+See `DEPLOYMENT.md` for the deployment, backup, health-check and rollback checklist.
+
+## GitHub Actions
+
+Hosted CI is deliberately conservative to reduce Actions consumption:
+
+- backend CI is path-filtered
+- Next.js CI is path-filtered
+- full Docker image validation is manual
+- superseded runs are cancelled through workflow concurrency
+
+Before merging a release candidate, run the relevant backend and frontend gates and the manual container validation once.
 
 ## Development workflow
 
@@ -112,4 +154,4 @@ docker compose up --build
 feature/* -> development -> main
 ```
 
-Feature work is merged only after the relevant GitHub Actions checks pass.
+Feature work is merged only after the relevant checks pass. `main` is reserved for release-ready code.
