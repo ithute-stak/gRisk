@@ -1,11 +1,8 @@
 .loanhub-studio-engine .document-paper{
-  padding-top:72mm!important;
-  padding-bottom:27mm!important;
+  padding-top:40mm!important;
+  padding-bottom:16mm!important;
   background-color:#fff!important;
-  background-image:linear-gradient(#f47a20,#f47a20),linear-gradient(#d9dde2,#d9dde2);
-  background-repeat:no-repeat;
-  background-size:1.5px 25mm,.6px calc(100% - 140mm);
-  background-position:left 18mm top 92mm,left 18mm top 92mm;
+  background-image:none!important;
   -webkit-print-color-adjust:exact;
   print-color-adjust:exact;
 }
@@ -26,19 +23,16 @@
 
 .loanhub-studio-engine .document-paper::before{
   top:0;
-  height:70mm;
+  height:34mm;
   background-image:url("/brand/guardrisk-premium-letterhead-v2.svg");
-  background-size:210mm 70mm;
-  box-shadow:inset 0 4.5mm 0 #f47a20;
+  background-size:210mm 34mm;
 }
 
 .loanhub-studio-engine .document-paper::after{
   bottom:0;
-  height:22mm;
-  background-color:#f7f8f9;
+  height:10mm;
   background-image:url("/brand/guardrisk-premium-footer-v2.svg");
-  background-size:210mm 22mm;
-  box-shadow:inset 0 1.25mm 0 #f47a20;
+  background-size:210mm 10mm;
 }
 
 .loanhub-studio-engine .document-paper>.office-paper-brand{
@@ -48,20 +42,19 @@
 .loanhub-studio-engine .document-editor-content{
   position:relative;
   z-index:1;
-  min-height:calc(297mm - 99mm);
+  min-height:calc(297mm - 56mm);
 }
 
-/* The official stationery is mandatory. Themes may style document content only. */
+/* Official stationery is fixed; themes style only editable document content. */
 .loanhub-studio-engine .loanhub-document-ribbon .office-tool-group:has(.office-checkbox){
   display:none!important;
 }
 
 @media print{
   .loanhub-studio-engine .document-paper{
-    padding-top:72mm!important;
-    padding-bottom:27mm!important;
+    padding-top:40mm!important;
+    padding-bottom:16mm!important;
     box-shadow:none!important;
-    background-image:none!important;
   }
   .loanhub-studio-engine .document-paper::before{
     position:fixed;
