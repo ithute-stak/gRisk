@@ -17,6 +17,10 @@ function loginError(status: number, detail?: string): NextResponse {
 }
 
 export async function POST(request: NextRequest) {
+  if (request.headers.get("x-grisk-request") !== "1") {
+    return NextResponse.json({ detail: "Invalid application request." }, { status: 403 });
+  }
+
   let payload: { email?: unknown; password?: unknown };
   try {
     payload = (await request.json()) as { email?: unknown; password?: unknown };
