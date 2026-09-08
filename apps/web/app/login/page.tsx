@@ -46,14 +46,21 @@ export default function LoginPage() {
       <section className="login-hero">
         <div className="login-copy">
           <div className="brand-mark">gR</div>
-          <h1>Risk work, without the friction.</h1>
-          <p>One operating workspace for customers, quotations, policies and claims, backed by FastAPI, PostgreSQL and controlled Alembic migrations.</p>
+          <div className="login-eyebrow">Guardrisk 360 · Lesotho</div>
+          <h1>Insurance and risk operations, in one clear workspace.</h1>
+          <p>Manage customers, quotations, policies, claims, medical aid, guarantees, finance and enterprise risk from the same secure operating platform.</p>
+          <div className="login-capabilities" aria-label="Platform capabilities">
+            <span>Insurance</span>
+            <span>Medical Aid</span>
+            <span>Bonds & Guarantees</span>
+            <span>Risk Management</span>
+          </div>
         </div>
       </section>
       <section className="login-panel">
         <div className="login-card">
           <h2>Welcome back</h2>
-          <p>Sign in with your gRisk account to continue.</p>
+          <p>Sign in with your gRisk account to continue to Guardrisk 360.</p>
           <form onSubmit={submit}>
             {error && <div className="notice error">{error}</div>}
             <div className="field">
@@ -64,8 +71,9 @@ export default function LoginPage() {
               <label htmlFor="password">Password</label>
               <input id="password" className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
-            <button className="button" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+            <button className="button" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in securely"}</button>
           </form>
+          <div className="login-security"><span className="status-dot" /> Secure session · role-based access · audited operations</div>
         </div>
       </section>
     </div>
