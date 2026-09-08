@@ -115,7 +115,12 @@ async def list_invoices(
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
-    return InvoiceListResponse(items=list(result.scalars().all()), total=total, page=page, page_size=page_size)
+    return InvoiceListResponse(
+        items=list(result.scalars().all()),
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.post("/invoices", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)
@@ -133,13 +138,19 @@ async def create_invoice(
         if policy is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found")
         if policy.customer_id != payload.customer_id:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Policy does not belong to customer")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Policy does not belong to customer",
+            )
     if payload.medical_member_id is not None:
         member = await session.get(MedicalMember, payload.medical_member_id)
         if member is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Medical member not found")
         if member.customer_id != payload.customer_id:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Medical member does not belong to customer")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Medical member does not belong to customer",
+            )
 
     invoice = Invoice(
         **payload.model_dump(exclude={"currency"}),
@@ -154,12 +165,23 @@ async def create_invoice(
         entity_type="invoice",
         entity_id=str(invoice.id),
         actor_user_id=user.id,
-        details={"invoice_number": invoice.invoice_number, "customer_id": str(invoice.customer_id), "amount_due": str(invoice.amount_due)},
+        details={
+            "invoice_number": invoice.invoice_number,
+            "customer_id": str(invoice.customer_id),
+            "amount_due": str(invoice.amount_due),
+        },
         ip_address=request.client.host if request.client else None,
     )
     await session.commit()
     created = await _get_invoice_or_404(session, invoice.id)
-    await manager.broadcast("finance", {"channel": "finance", "event": "invoice.created", "data": {"id": str(created.id), "invoice_number": created.invoice_number}})
+    await manager.broadcast(
+        "finance",
+        {
+            "channel": "finance",
+            "event": "invoice.created",
+            "data": {"id": str(created.id), "invoice_number": created.invoice_number},
+        },
+    )
     return created
 
 
@@ -178,12 +200,18 @@ async def update_invoice(
 ):
     invoice = await _get_invoice_or_404(session, invoice_id)
     if invoice.status != "draft":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only draft invoices can be edited")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only draft invoices can be edited",
+        )
     changes = payload.model_dump(exclude_unset=True)
     issue_date = invoice.issue_date
     due_date = changes.get("due_date", invoice.due_date)
     if due_date < issue_date:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="due_date must be on or after issue_date")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="due_date must be on or after issue_date",
+        )
     for field, value in changes.items():
         setattr(invoice, field, value)
     await record_audit_event(
@@ -209,12 +237,19 @@ async def update_invoice_status(
 ):
     invoice = await _get_invoice_or_404(session, invoice_id)
     previous = invoice.status
-    if payload.status == "issued":
-        if previous != "draft":
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only draft invoices can be issued")
-    elif payload.status == "cancelled":
-        if previous not in {"draft", "issued"} or invoice.amount_paid > 0:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Paid or partially paid invoices cannot be cancelled")
+    if payload.status == "issued" and previous != "draft":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only draft invoices can be issued",
+        )
+    if (
+        payload.status == "cancelled"
+        and (previous not in {"draft", "issued"} or invoice.amount_paid > 0)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Paid or partially paid invoices cannot be cancelled",
+        )
     invoice.status = payload.status
     notifications = []
     if payload.status == "issued":
@@ -223,7 +258,10 @@ async def update_invoice_status(
             customer_id=invoice.customer_id,
             category="finance",
             title=f"Invoice {invoice.invoice_number} issued",
-            message=f"A new invoice for {invoice.currency} {invoice.amount_due} has been issued and is due on {invoice.due_date.isoformat()}.",
+            message=(
+                f"A new invoice for {invoice.currency} {invoice.amount_due} has been issued "
+                f"and is due on {invoice.due_date.isoformat()}."
+            ),
             action_url="/portal",
         )
     await record_audit_event(
@@ -237,9 +275,23 @@ async def update_invoice_status(
     )
     await session.commit()
     updated = await _get_invoice_or_404(session, invoice.id)
-    await manager.broadcast("finance", {"channel": "finance", "event": "invoice.status_changed", "data": {"id": str(updated.id), "status": updated.status}})
+    await manager.broadcast(
+        "finance",
+        {
+            "channel": "finance",
+            "event": "invoice.status_changed",
+            "data": {"id": str(updated.id), "status": updated.status},
+        },
+    )
     for notification in notifications:
-        await manager.broadcast(f"notifications:{notification.user_id}", {"channel": f"notifications:{notification.user_id}", "event": "notification.created", "data": {"id": str(notification.id), "title": notification.title}})
+        await manager.broadcast(
+            f"notifications:{notification.user_id}",
+            {
+                "channel": f"notifications:{notification.user_id}",
+                "event": "notification.created",
+                "data": {"id": str(notification.id), "title": notification.title},
+            },
+        )
     return updated
 
 
@@ -252,7 +304,10 @@ async def record_payment(
 ):
     invoice = await _get_invoice_or_404(session, payload.invoice_id)
     if invoice.status not in {"issued", "partially_paid"}:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Payments can only be recorded against issued invoices")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Payments can only be recorded against issued invoices",
+        )
     outstanding = _outstanding(invoice)
     if payload.amount > outstanding:
         raise HTTPException(
@@ -279,7 +334,10 @@ async def record_payment(
         customer_id=invoice.customer_id,
         category="finance",
         title=f"Payment received for {invoice.invoice_number}",
-        message=f"Payment of {invoice.currency} {payment.amount} was received. Outstanding balance: {invoice.currency} {_outstanding(invoice)}.",
+        message=(
+            f"Payment of {invoice.currency} {payment.amount} was received. "
+            f"Outstanding balance: {invoice.currency} {_outstanding(invoice)}."
+        ),
         action_url="/portal",
     )
     await record_audit_event(
@@ -288,12 +346,35 @@ async def record_payment(
         entity_type="payment",
         entity_id=str(payment.id),
         actor_user_id=user.id,
-        details={"payment_number": payment.payment_number, "invoice_id": str(invoice.id), "amount": str(payment.amount), "invoice_status": invoice.status},
+        details={
+            "payment_number": payment.payment_number,
+            "invoice_id": str(invoice.id),
+            "amount": str(payment.amount),
+            "invoice_status": invoice.status,
+        },
         ip_address=request.client.host if request.client else None,
     )
     await session.commit()
     await session.refresh(payment)
-    await manager.broadcast("finance", {"channel": "finance", "event": "payment.recorded", "data": {"id": str(payment.id), "invoice_id": str(invoice.id), "amount": str(payment.amount)}})
+    await manager.broadcast(
+        "finance",
+        {
+            "channel": "finance",
+            "event": "payment.recorded",
+            "data": {
+                "id": str(payment.id),
+                "invoice_id": str(invoice.id),
+                "amount": str(payment.amount),
+            },
+        },
+    )
     for notification in notifications:
-        await manager.broadcast(f"notifications:{notification.user_id}", {"channel": f"notifications:{notification.user_id}", "event": "notification.created", "data": {"id": str(notification.id), "title": notification.title}})
+        await manager.broadcast(
+            f"notifications:{notification.user_id}",
+            {
+                "channel": f"notifications:{notification.user_id}",
+                "event": "notification.created",
+                "data": {"id": str(notification.id), "title": notification.title},
+            },
+        )
     return payment
