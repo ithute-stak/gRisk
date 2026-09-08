@@ -22,8 +22,9 @@ const staffNavigation = [
   ["/notifications", "Notifications", "NT"],
   ["/portal", "Customer Portal", "PT"],
   ["/reports", "Reports", "RP"],
-  ["/admin", "Administration", "AD"],
 ] as const;
+
+const adminNavigation = ["/admin", "Administration", "AD"] as const;
 
 const portalNavigation = [
   ["/portal", "My Cover", "MC"],
@@ -46,7 +47,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   const staff = isStaffUser(user);
-  const navigation = staff ? staffNavigation : portalNavigation;
+  const navigation = staff
+    ? user?.isSuperuser
+      ? [...staffNavigation, adminNavigation]
+      : staffNavigation
+    : portalNavigation;
   const userName = user?.name || user?.email || "gRisk user";
 
   function signOut() {
@@ -77,7 +82,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="sidebar-foot">
-            <span>gRisk 0.9</span>
+            <span>gRisk 1.0</span>
             <small>{staff ? "Next.js + FastAPI" : "Secure customer access"}</small>
           </div>
         </aside>
