@@ -6,7 +6,12 @@ from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentUser, DbSession
 from app.models.partner import Partner
-from app.schemas.partner import PartnerCreate, PartnerListResponse, PartnerResponse, PartnerUpdate
+from app.schemas.partner import (
+    PartnerCreate,
+    PartnerListResponse,
+    PartnerResponse,
+    PartnerUpdate,
+)
 from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/partners", tags=["partners"])
