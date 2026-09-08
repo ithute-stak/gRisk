@@ -1,0 +1,16 @@
+# Replace grisk.example.com with the production Guardrisk hostname.
+# This example assumes Caddy runs on the VPS host while docker-compose.prod.yml
+# binds Next.js and FastAPI only to 127.0.0.1.
+
+grisk.example.com {
+    encode zstd gzip
+
+    # Same-origin WebSocket routing is required so the HttpOnly gRisk session
+    # cookie reaches FastAPI without exposing bearer tokens in URLs.
+    @websockets path /ws/*
+    reverse_proxy @websockets 127.0.0.1:8000
+
+    # All normal browser traffic, including /api/session and /api/proxy, goes
+    # through the Next.js BFF.
+    reverse_proxy 127.0.0.1:8080
+}

@@ -1,0 +1,108 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-grisk}
+      POSTGRES_USER: ${POSTGRES_USER:-grisk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-grisk}
+    ports:
+      - "5432:5432"
+    volumes:
+      - grisk_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-grisk} -d ${POSTGRES_DB:-grisk}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - grisk_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build:
+      context: ./apps/api
+    restart: "no"
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    environment:
+      GRISK_ENVIRONMENT: ${GRISK_ENVIRONMENT:-development}
+      GRISK_SECRET_KEY: ${GRISK_SECRET_KEY:-change-me}
+      GRISK_DATABASE_URL: ${GRISK_DATABASE_URL:-postgresql+asyncpg://grisk:grisk@postgres:5432/grisk}
+      GRISK_REDIS_URL: ${GRISK_REDIS_URL:-redis://redis:6379/0}
+      GRISK_CORS_ORIGINS: ${GRISK_CORS_ORIGINS:-http://localhost:8080}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ./apps/api
+    restart: unless-stopped
+    environment:
+      GRISK_ENVIRONMENT: ${GRISK_ENVIRONMENT:-development}
+      GRISK_SECRET_KEY: ${GRISK_SECRET_KEY:-change-me}
+      GRISK_DATABASE_URL: ${GRISK_DATABASE_URL:-postgresql+asyncpg://grisk:grisk@postgres:5432/grisk}
+      GRISK_REDIS_URL: ${GRISK_REDIS_URL:-redis://redis:6379/0}
+      GRISK_CORS_ORIGINS: ${GRISK_CORS_ORIGINS:-http://localhost:8080}
+      GRISK_LOGIN_RATE_LIMIT_ATTEMPTS: ${GRISK_LOGIN_RATE_LIMIT_ATTEMPTS:-10}
+      GRISK_LOGIN_RATE_LIMIT_WINDOW_SECONDS: ${GRISK_LOGIN_RATE_LIMIT_WINDOW_SECONDS:-300}
+      GRISK_DOCUMENT_STORAGE_PATH: /data/documents
+      GRISK_DOCUMENT_MAX_UPLOAD_MB: ${GRISK_DOCUMENT_MAX_UPLOAD_MB:-20}
+    ports:
+      - "8000:8000"
+    volumes:
+      - grisk_documents:/data/documents
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3).read()"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  web:
+    build:
+      context: ./apps/web
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: ${WEB_API_BASE_URL:-http://api:8000}
+      GRISK_COOKIE_SECURE: ${GRISK_COOKIE_SECURE:-false}
+    ports:
+      - "8080:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  grisk_postgres:
+  grisk_redis:
+  grisk_documents:

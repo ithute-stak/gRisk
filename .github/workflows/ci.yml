@@ -1,0 +1,87 @@
+name: gRisk Backend CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches:
+      - main
+      - development
+    types:
+      - ready_for_review
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grisk-backend-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: FastAPI + Alembic
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: grisk
+          POSTGRES_USER: grisk
+          POSTGRES_PASSWORD: grisk
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U grisk -d grisk"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      GRISK_ENVIRONMENT: test
+      GRISK_SECRET_KEY: ci-only-secret-key-with-at-least-32-bytes
+      GRISK_DATABASE_URL: postgresql+asyncpg://grisk:grisk@127.0.0.1:5432/grisk
+      GRISK_REDIS_URL: redis://127.0.0.1:6379/0
+      GRISK_DOCUMENT_STORAGE_PATH: /tmp/grisk-test-documents
+      GRISK_DOCUMENT_MAX_UPLOAD_MB: 20
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            apps/api/requirements.txt
+            apps/api/requirements-dev.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Ruff
+        run: python -m ruff check app tests
+      - name: Apply migrations
+        run: python -m alembic upgrade head
+      - name: Check model migration sync
+        run: python -m alembic check
+      - name: Migration rollback smoke test
+        run: python -m alembic downgrade -1 && python -m alembic upgrade head
+      - name: Pytest
+        run: python -m pytest -q

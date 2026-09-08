@@ -1,0 +1,1 @@
+The active frontend has been migrated from Blazor WebAssembly to Next.js App Router. Legacy Blazor source files were removed. GitHub Actions now runs backend and frontend checks only when their paths change, and Docker validation is manual to conserve hosted-runner minutes.
