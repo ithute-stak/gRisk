@@ -114,3 +114,89 @@ export type ClaimList = {
   page: number;
   page_size: number;
 };
+
+export type MedicalBenefit = {
+  id: string;
+  plan_id: string;
+  code: string;
+  name: string;
+  category: string;
+  description: string | null;
+  annual_monetary_limit: string | null;
+  per_event_limit: string | null;
+  annual_visit_limit: number | null;
+  requires_authorisation: boolean;
+  is_active: boolean;
+};
+
+export type MedicalPlan = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  monthly_premium: string | null;
+  currency: string;
+  is_active: boolean;
+  benefits: MedicalBenefit[];
+};
+
+export type MedicalDependant = {
+  id: string;
+  member_id: string;
+  first_name: string;
+  last_name: string;
+  relationship_type: string;
+  date_of_birth: string | null;
+  status: string;
+  created_at: string;
+};
+
+export type MedicalMember = {
+  id: string;
+  member_number: string;
+  customer_id: string;
+  plan_id: string;
+  status: string;
+  start_date: string;
+  end_date: string | null;
+  created_at: string;
+  updated_at: string;
+  dependants?: MedicalDependant[];
+};
+
+export type MedicalMemberList = {
+  items: MedicalMember[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export type MedicalClaim = {
+  id: string;
+  claim_number: string;
+  member_id: string;
+  dependant_id: string | null;
+  claim_kind: string;
+  status: string;
+  service_date: string;
+  admission_date: string | null;
+  discharge_date: string | null;
+  claim_amount: string;
+  approved_amount: string | null;
+  provider_name: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BenefitBalance = {
+  member_id: string;
+  benefit_id: string;
+  benefit_code: string;
+  benefit_name: string;
+  year: number;
+  used_amount: string;
+  remaining_amount: string | null;
+  used_units: number;
+  remaining_units: number | null;
+};

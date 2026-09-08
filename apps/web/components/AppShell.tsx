@@ -12,6 +12,7 @@ const navigation = [
   ["/quotations", "Quotations", "QT"],
   ["/policies", "Policies", "PL"],
   ["/claims", "Claims", "CL"],
+  ["/medical", "Medical Aid", "MD"],
   ["/reports", "Reports", "RP"],
   ["/finance", "Finance", "FN"],
   ["/risk", "Risk", "RK"],
@@ -57,7 +58,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="sidebar-foot">
-            <span>gRisk 0.5</span>
+            <span>gRisk 0.6</span>
             <small>Next.js + FastAPI</small>
           </div>
         </aside>
