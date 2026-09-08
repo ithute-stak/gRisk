@@ -1,21 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="70mm" viewBox="0 0 210 70">
-  <rect width="210" height="4.5" fill="#F47A20"/>
-  <path d="M0 4.5H36L29 12H0Z" fill="#C97800"/>
-  <circle cx="24" cy="31" r="7.4" fill="#F47A20"/>
-  <text x="24" y="33.6" text-anchor="middle" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="6" font-weight="700">G</text>
-  <text x="39" y="28.7" fill="#F47A20" font-family="Arial,Helvetica,sans-serif" font-size="6.8" font-weight="700">GUARDRISK</text>
-  <text x="39" y="34.2" fill="#30343B" font-family="Arial,Helvetica,sans-serif" font-size="3.2" font-weight="700">INSURANCE BROKERS</text>
-  <text x="39" y="39.2" fill="#6B7280" font-family="Arial,Helvetica,sans-serif" font-size="2.7">Financial Planning | Insurance | Risk Advisory</text>
-  <text x="192" y="23.8" text-anchor="end" fill="#30343B" font-family="Arial,Helvetica,sans-serif" font-size="3.1" font-weight="700">LNDC CENTRE, GROUND FLOOR</text>
-  <text x="192" y="29.2" text-anchor="end" fill="#6B7280" font-family="Arial,Helvetica,sans-serif" font-size="2.7">Kingsway, Maseru 100, Lesotho</text>
-  <text x="192" y="34.6" text-anchor="end" fill="#6B7280" font-family="Arial,Helvetica,sans-serif" font-size="2.7">(+266) 2232 2537 / 5939 5332 / 6272 0488</text>
-  <text x="192" y="40" text-anchor="end" fill="#6B7280" font-family="Arial,Helvetica,sans-serif" font-size="2.7">info@guardrisk.co.ls</text>
-  <text x="192" y="45.4" text-anchor="end" fill="#30343B" font-family="Arial,Helvetica,sans-serif" font-size="2.8" font-weight="700">IBR No. 69915</text>
-  <line x1="18" y1="51" x2="47" y2="51" stroke="#F47A20" stroke-width="1.4"/>
-  <line x1="47" y1="51" x2="192" y2="51" stroke="#D9DDE2" stroke-width="0.45"/>
-  <text x="18" y="63" fill="#6B7280" font-family="Arial,Helvetica,sans-serif" font-size="2.6" font-weight="700">DATE</text>
-  <line x1="31" y1="63.8" x2="68" y2="63.8" stroke="#D9DDE2" stroke-width="0.4"/>
-  <text x="81" y="63" fill="#6B7280" font-family="Arial,Helvetica,sans-serif" font-size="2.6" font-weight="700">REFERENCE</text>
-  <line x1="101" y1="63.8" x2="145" y2="63.8" stroke="#D9DDE2" stroke-width="0.4"/>
-  <text x="192" y="63" text-anchor="end" fill="#8A9098" font-family="Arial,Helvetica,sans-serif" font-size="2.6">OFFICIAL CORRESPONDENCE</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="34mm" viewBox="0 0 210 34">
+  <circle cx="105" cy="7.8" r="5.5" fill="none" stroke="#D67B16" stroke-width="0.8"/>
+  <text x="105" y="10.1" text-anchor="middle" fill="#1F4E79" font-family="Georgia,Times New Roman,serif" font-size="6.8" font-weight="700">G</text>
+  <text x="105" y="18.5" text-anchor="middle" fill="#1F4E79" font-family="Arial,Helvetica,sans-serif" font-size="5.8" font-weight="700" letter-spacing="0.7">GUARDRISK</text>
+  <text x="105" y="23.8" text-anchor="middle" fill="#667085" font-family="Arial,Helvetica,sans-serif" font-size="2.6" letter-spacing="0.35">INSURANCE BROKERS</text>
+  <line x1="18" y1="30" x2="192" y2="30" stroke="#D6A11D" stroke-width="0.65"/>
 </svg>
