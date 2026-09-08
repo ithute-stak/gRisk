@@ -5,7 +5,11 @@ from types import SimpleNamespace
 from typing import Any
 
 from docx import Document as WordDocument
-from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_ROW_HEIGHT_RULE, WD_TABLE_ALIGNMENT
+from docx.enum.table import (
+    WD_CELL_VERTICAL_ALIGNMENT,
+    WD_ROW_HEIGHT_RULE,
+    WD_TABLE_ALIGNMENT,
+)
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -78,7 +82,6 @@ def _draw_pdf_letterhead(canvas: pdf_canvas.Canvas, width: float, height: float)
     light_line = colors.HexColor(LIGHT_LINE)
     footer_bg = colors.HexColor(FOOTER_BG)
 
-    # Premium top bands.
     canvas.setFillColor(orange)
     canvas.rect(0, height - 4.5 * mm, width, 4.5 * mm, stroke=0, fill=1)
     canvas.setFillColor(dark_orange)
@@ -90,7 +93,6 @@ def _draw_pdf_letterhead(canvas: pdf_canvas.Canvas, width: float, height: float)
     path.close()
     canvas.drawPath(path, stroke=0, fill=1)
 
-    # Left logo and business identity.
     logo_x = 24 * mm
     logo_y = height - 31 * mm
     canvas.setFillColor(orange)
@@ -110,7 +112,6 @@ def _draw_pdf_letterhead(canvas: pdf_canvas.Canvas, width: float, height: float)
     canvas.setFont("Helvetica", 6.3)
     canvas.drawString(brand_x, height - 39 * mm, SERVICE_LINE)
 
-    # Right contact block.
     right = width - 18 * mm
     canvas.setFillColor(charcoal)
     canvas.setFont("Helvetica-Bold", 7.2)
@@ -124,7 +125,6 @@ def _draw_pdf_letterhead(canvas: pdf_canvas.Canvas, width: float, height: float)
     canvas.setFont("Helvetica-Bold", 6.6)
     canvas.drawRightString(right, height - 45 * mm, IBR_LINE)
 
-    # Divider and correspondence metadata row.
     left = 18 * mm
     rule_y = height - 51 * mm
     canvas.setStrokeColor(orange)
@@ -146,7 +146,6 @@ def _draw_pdf_letterhead(canvas: pdf_canvas.Canvas, width: float, height: float)
     canvas.line(31 * mm, meta_y - 1.2 * mm, 68 * mm, meta_y - 1.2 * mm)
     canvas.line(101 * mm, meta_y - 1.2 * mm, 145 * mm, meta_y - 1.2 * mm)
 
-    # Signature vertical accent from the approved stationery.
     side_x = 18 * mm
     footer_top = 20 * mm
     side_top = height - 92 * mm
@@ -159,7 +158,6 @@ def _draw_pdf_letterhead(canvas: pdf_canvas.Canvas, width: float, height: float)
         canvas.setLineWidth(1.5)
         canvas.line(side_x, side_top - 25 * mm, side_x, side_top)
 
-    # Fixed premium footer. Its background also masks the legacy page-number footer.
     canvas.setFillColor(footer_bg)
     canvas.rect(0, 0, width, 19 * mm, stroke=0, fill=1)
     canvas.setFillColor(orange)
@@ -281,8 +279,8 @@ def _add_header(section: Any) -> None:
     identity.alignment = WD_TABLE_ALIGNMENT.CENTER
     identity.autofit = False
     left, right = identity.rows[0].cells
-    left.width = available * 0.56
-    right.width = available * 0.44
+    left.width = int(available * 0.56)
+    right.width = int(available * 0.44)
     left.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
     right.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
 
@@ -322,7 +320,7 @@ def _add_header(section: Any) -> None:
     rule.rows[0].height = Mm(0.8)
     rule.rows[0].height_rule = WD_ROW_HEIGHT_RULE.EXACTLY
     rule.cells[0].width = Mm(29)
-    rule.cells[1].width = available - Mm(29)
+    rule.cells[1].width = int(available - Mm(29))
     for cell in rule.rows[0].cells:
         _zero_cell_margins(cell)
     _shade_cell(rule.cell(0, 0), ORANGE)
@@ -361,8 +359,8 @@ def _add_footer(section: Any) -> None:
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
     left, right = table.rows[0].cells
-    left.width = available * 0.67
-    right.width = available * 0.33
+    left.width = int(available * 0.67)
+    right.width = int(available * 0.33)
     _shade_cell(left, FOOTER_BG)
     _shade_cell(right, FOOTER_BG)
 
