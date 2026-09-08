@@ -1,36 +1,42 @@
 # gRisk production deployment guide
 
-This guide is the baseline for a single-VPS Docker Compose deployment. Adapt hostnames, firewall rules, backup destinations and provider integrations to the actual Guardrisk environment.
+This guide is the baseline for a single-VPS production deployment of gRisk 1.0. Adapt the hostname, firewall, backup destination and provider integrations to the actual Guardrisk environment.
 
 ## 1. Host prerequisites
 
 - current Linux server with Docker Engine and Docker Compose v2
-- HTTPS reverse proxy in front of the Next.js service
-- DNS for the production gRisk hostname
-- firewall allowing only SSH administration and public HTTP/HTTPS as required
+- public DNS record for the production gRisk hostname
+- HTTPS reverse proxy such as Caddy, Nginx or Traefik
+- firewall allowing only the administration ports you require and public HTTP/HTTPS
 - persistent encrypted backup destination outside the VPS
 - system clock synchronisation enabled
 
-PostgreSQL and Redis should remain private to the Docker network. The production Compose file does not publish their ports.
+`docker-compose.prod.yml` keeps PostgreSQL and Redis private. Next.js and FastAPI bind only to `127.0.0.1`, so public traffic must enter through the TLS reverse proxy.
 
 ## 2. Production environment
 
-Create `.env.production` outside source control. At minimum provide:
+Copy `.env.production.example` to a deployment-only `.env.production` file and replace every `CHANGE_ME` value.
+
+At minimum configure:
 
 ```text
 POSTGRES_DB=grisk
 POSTGRES_USER=<dedicated-database-user>
 POSTGRES_PASSWORD=<strong-random-password>
-GRISK_DATABASE_URL=postgresql+asyncpg://<user>:<password>@postgres:5432/grisk
+GRISK_DATABASE_URL=postgresql+asyncpg://<url-encoded-user>:<url-encoded-password>@postgres:5432/grisk
 GRISK_REDIS_URL=redis://redis:6379/0
 GRISK_SECRET_KEY=<cryptographically-random-secret-at-least-32-characters>
 GRISK_CORS_ORIGINS=https://grisk.example.com
 GRISK_LOGIN_RATE_LIMIT_ATTEMPTS=10
 GRISK_LOGIN_RATE_LIMIT_WINDOW_SECONDS=300
+GRISK_DOCUMENT_MAX_UPLOAD_MB=20
 GRISK_WEB_PORT=8080
+GRISK_API_PORT=8000
 ```
 
-Never commit `.env.production`, database passwords, JWT signing secrets or provider credentials.
+If the database password contains URL-special characters, URL-encode it in `GRISK_DATABASE_URL`. Never commit `.env.production`, database passwords, JWT signing secrets, provider credentials or backup credentials.
+
+The production Compose configuration forces the Next.js authentication cookie to `Secure`; production therefore requires HTTPS.
 
 ## 3. Validate configuration before starting
 
@@ -38,7 +44,7 @@ Never commit `.env.production`, database passwords, JWT signing secrets or provi
 docker compose -f docker-compose.prod.yml --env-file .env.production config
 ```
 
-The FastAPI production configuration also rejects weak signing secrets, the development database URL, wildcard CORS and non-HTTPS browser origins.
+FastAPI production validation rejects weak signing secrets, default `grisk/grisk` database credentials, wildcard CORS, non-HTTPS browser origins and invalid upload limits.
 
 ## 4. Build and start
 
@@ -78,17 +84,26 @@ docker compose -f docker-compose.prod.yml --env-file .env.production run --rm \
   api python -m app.scripts.bootstrap_admin
 ```
 
-The script does not overwrite an existing user. Remove bootstrap credentials from shell history/environment where practical and change the temporary password through the administration workflow.
+The script does not overwrite an existing user. Remove bootstrap credentials from shell history/environment where practical and reset the temporary password through Administration after first sign-in.
 
 ## 6. Reverse proxy and TLS
 
-Expose the Next.js service through an HTTPS reverse proxy. Proxy normal HTTP traffic to the configured gRisk web port. FastAPI is reached server-to-server through the Next.js `/api/proxy/*` route.
+Use one public HTTPS hostname for the web application and realtime WebSockets. A matching example is provided in `Caddyfile.example`.
 
-If realtime WebSockets are exposed through a reverse proxy, ensure WebSocket upgrade headers are forwarded. gRisk WebSocket connections require an access token and portal users can only subscribe to their own notification channel.
+Routing requirements:
 
-Do not expose PostgreSQL or Redis publicly.
+```text
+https://grisk.example.com/ws/*   -> 127.0.0.1:8000  (FastAPI WebSocket upgrade)
+https://grisk.example.com/*      -> 127.0.0.1:8080  (Next.js)
+```
 
-## 7. Health checks
+Normal browser API traffic goes through the Next.js BFF (`/api/session/*` and `/api/proxy/*`). The FastAPI access token is held in an **HttpOnly, SameSite=Strict, Secure** cookie and is never stored in browser local/session storage. The BFF injects the bearer token server-side.
+
+Production WebSockets also authenticate from that HttpOnly cookie and enforce the configured HTTPS origin. Do not put access tokens in production WebSocket query strings.
+
+Do not route `/api/v1/auth/login` directly to the public internet and do not expose PostgreSQL or Redis publicly.
+
+## 7. Health and observability
 
 Application checks:
 
@@ -98,82 +113,96 @@ GET /api/v1/health/live             FastAPI liveness
 GET /api/v1/health/ready            FastAPI + PostgreSQL + Redis readiness
 ```
 
-The readiness endpoint returns HTTP 503 when a required backend dependency is unavailable.
+FastAPI readiness returns HTTP 503 when a required backend dependency is unavailable. Every FastAPI HTTP response includes `X-Request-ID`; request logs contain request ID, method, path, status and duration without request bodies or passwords.
 
-Every FastAPI HTTP response includes `X-Request-ID`. Server request logs contain request ID, method, path, response status and duration without request bodies.
+Next.js and FastAPI both apply defensive browser/security headers. Production API docs are disabled.
 
 ## 8. Database migrations
 
-Alembic is mandatory.
+Alembic is mandatory for every application schema change. The production Compose stack runs a one-shot migration container before the API starts.
 
-Check current migration state inside the API image:
+Check current state:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.production run --rm api \
   python -m alembic current
 ```
 
-Apply migrations manually when required:
+Apply manually when required:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.production run --rm api \
   python -m alembic upgrade head
 ```
 
-Do not use ad-hoc SQL to modify the application schema.
+Do not use ad-hoc SQL to modify production application tables.
 
-## 9. Backup baseline
+## 9. Backups
 
-At minimum, schedule encrypted daily PostgreSQL backups and retain more than one generation. Keep a copy outside the application VPS.
+The authoritative durable data is split between PostgreSQL and the `grisk_documents` Docker volume. Back up both.
 
-Example logical backup:
+Example PostgreSQL logical backup:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres \
   pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > grisk-$(date +%F-%H%M).dump
 ```
 
-Back up any future object/document storage independently. Redis is not the system of record and should not be treated as the authoritative backup source.
+Example document-volume archive:
 
-Test restore procedures periodically on a non-production environment.
+```bash
+docker run --rm \
+  -v grisk_grisk_documents:/source:ro \
+  -v "$PWD/backups":/backup \
+  alpine sh -c 'tar czf /backup/grisk-documents-$(date +%F-%H%M).tgz -C /source .'
+```
+
+The exact Docker volume name may differ if a custom Compose project name is used; confirm it with `docker volume ls`.
+
+Schedule encrypted daily backups, retain multiple generations and keep at least one copy outside the application VPS. Redis is not the system of record.
 
 ## 10. Restore drill
 
-For a controlled restore, stop application writes, create a fresh PostgreSQL database/container, restore the selected dump, then run Alembic to confirm the restored schema is at the expected revision before opening traffic.
+Restore testing must be performed in a non-production environment on a regular schedule.
 
-Example restore into a prepared database:
+For PostgreSQL, restore the selected dump into a prepared database and then verify Alembic state:
 
 ```bash
 cat grisk-backup.dump | docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres \
   pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists
+
+docker compose -f docker-compose.prod.yml --env-file .env.production run --rm api \
+  python -m alembic current
 ```
 
-Always rehearse the exact restore command with your real backup process before relying on it for disaster recovery.
+Restore the document archive into the document volume before reopening application traffic. Always rehearse the exact commands with the real backup destination and retention process.
 
 ## 11. Release checklist
 
 Before promoting `development` to `main`:
 
 - backend CI green: Ruff, Alembic upgrade/check/rollback, Pytest
-- Next.js typecheck/build green
-- manual Docker Compose/container build validation green
-- production environment validated with `docker compose config`
-- database backup captured before applying production migrations
+- Next.js typecheck and production build green
+- full Docker Compose/container smoke validation green
+- production Compose validates with the real environment file
+- production database and document backups captured before migration/deployment
+- HTTPS reverse proxy configured with `/ws/*` routed to FastAPI and all other traffic to Next.js
+- login/session, customer search, quotation/policy, claims, Medical Aid, finance, documents, reports and Administration smoke-tested
 - health checks green after deployment
-- login, customer search, quotation/policy, claim, medical, finance, reports and administration smoke-tested
-- no bootstrap or provider secrets left in source control or command files
+- no bootstrap, database, JWT or provider secrets stored in source control
+- restore procedure has a named owner and a recent successful drill
 
-## 12. Rollback approach
+## 12. Rollback
 
 Application rollback and database rollback are separate decisions.
 
-For application-only regressions where the database migration is backward-compatible, redeploy the previous known-good image/commit.
+For an application-only regression where database changes are backward compatible, redeploy the previous known-good image/commit.
 
-For a migration-related rollback, review the specific Alembic revision before running a downgrade. Never downgrade production automatically without confirming whether the downgrade removes or transforms data. Restore from a verified backup when data preservation requires it.
+For migration-related rollback, inspect the specific Alembic revision before downgrading. Never automatically downgrade production when a revision may remove or transform data. Restore from a verified backup when data preservation requires it.
 
 ## 13. External integrations
 
-Insurer, payment/bank, SMS, WhatsApp, email and medical-provider connections are provider-specific. Add them only when Guardrisk has confirmed:
+The production platform includes a strategic-partner/integration registry, but insurer, bank/payment, SMS, WhatsApp, email and medical-provider connections are provider-specific. Enable each one only after Guardrisk supplies and approves:
 
 - provider name and API documentation
 - authentication method
@@ -181,6 +210,7 @@ Insurer, payment/bank, SMS, WhatsApp, email and medical-provider connections are
 - callback/webhook requirements
 - production endpoints
 - data fields and reconciliation rules
-- expected retry/idempotency behaviour
+- retry/idempotency expectations
+- provider security and operational contacts
 
-Do not place provider credentials in the repository. Use deployment secrets/environment injection.
+Do not invent production endpoints or put provider credentials in the repository. Use deployment secret injection and test each provider in its sandbox before activation.
