@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Protected from "@/components/Protected";
-import { clearToken, currentUser } from "@/lib/auth";
+import { currentUser } from "@/lib/auth";
+import { logout } from "@/lib/api";
 import type { AuthUser } from "@/lib/types";
 
 const staffRoleNames = new Set(["superadmin", "admin", "broker", "claims", "medical", "finance", "risk", "viewer"]);
@@ -19,11 +20,14 @@ const staffNavigation = [
   ["/bonds", "Bonds & Guarantees", "BG"],
   ["/risk", "Risk Management", "RK"],
   ["/finance", "Finance", "FN"],
+  ["/documents", "Documents", "DC"],
+  ["/partners", "Partners", "PR"],
   ["/notifications", "Notifications", "NT"],
   ["/portal", "Customer Portal", "PT"],
   ["/reports", "Reports", "RP"],
-  ["/admin", "Administration", "AD"],
 ] as const;
+
+const adminNavigation = ["/admin", "Administration", "AD"] as const;
 
 const portalNavigation = [
   ["/portal", "My Cover", "MC"],
@@ -42,15 +46,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
-    setUser(currentUser());
+    const syncUser = () => setUser(currentUser());
+    syncUser();
+    window.addEventListener("grisk-session", syncUser);
+    return () => window.removeEventListener("grisk-session", syncUser);
   }, [pathname]);
 
   const staff = isStaffUser(user);
-  const navigation = staff ? staffNavigation : portalNavigation;
+  const navigation = staff
+    ? user?.isSuperuser
+      ? [...staffNavigation, adminNavigation]
+      : staffNavigation
+    : portalNavigation;
   const userName = user?.name || user?.email || "gRisk user";
 
-  function signOut() {
-    clearToken();
+  async function signOut() {
+    await logout();
     router.replace("/login");
   }
 
@@ -77,7 +88,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="sidebar-foot">
-            <span>gRisk 0.9</span>
+            <span>gRisk 1.0</span>
             <small>{staff ? "Next.js + FastAPI" : "Secure customer access"}</small>
           </div>
         </aside>
@@ -94,7 +105,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="topbar-user">
               <div className="user-avatar">{userName.slice(0, 1).toUpperCase()}</div>
               <span className="user-name">{userName}</span>
-              <button className="button ghost small" onClick={signOut}>Sign out</button>
+              <button className="button ghost small" onClick={() => void signOut()}>Sign out</button>
             </div>
           </header>
           <main className="page-container">{children}</main>

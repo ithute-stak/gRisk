@@ -1,16 +1,18 @@
-FROM node:24-alpine AS deps
+FROM node:24-alpine@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf AS base
+
+FROM base AS deps
 WORKDIR /app
 COPY package.json ./
 RUN npm install --no-audit --no-fund
 
-FROM node:24-alpine AS build
+FROM base AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-FROM node:24-alpine AS runner
+FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

@@ -1,6 +1,7 @@
 from app.models.audit import AuditEvent
 from app.models.claim import Claim, ClaimEvent
 from app.models.customer import Customer, CustomerAddress, CustomerContact, CustomerNote
+from app.models.document import Document
 from app.models.finance import Invoice, Payment
 from app.models.guarantee import Guarantee, GuaranteeEvent
 from app.models.identity import Role, User, user_roles
@@ -15,6 +16,7 @@ from app.models.medical import (
     MedicalUtilisation,
 )
 from app.models.notification import Notification
+from app.models.partner import Partner
 from app.models.portal import CustomerPortalAccess
 from app.models.risk import RiskAssessment, RiskRegisterItem
 
@@ -27,6 +29,7 @@ __all__ = [
     "CustomerContact",
     "CustomerNote",
     "CustomerPortalAccess",
+    "Document",
     "Guarantee",
     "GuaranteeEvent",
     "InsuranceProduct",
@@ -39,6 +42,7 @@ __all__ = [
     "MedicalPlan",
     "MedicalUtilisation",
     "Notification",
+    "Partner",
     "Payment",
     "Policy",
     "Quote",

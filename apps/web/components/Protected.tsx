@@ -2,18 +2,34 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getToken } from "@/lib/auth";
+import { currentUser, refreshCurrentUser } from "@/lib/auth";
 
 export default function Protected({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!getToken()) {
-      router.replace("/login");
-      return;
-    }
-    setReady(true);
+    let active = true;
+    void refreshCurrentUser()
+      .then((user) => {
+        if (!active) return;
+        if (!user) {
+          router.replace("/login");
+          return;
+        }
+        setReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        if (currentUser()) {
+          setReady(true);
+        } else {
+          router.replace("/login");
+        }
+      });
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   if (!ready) {
