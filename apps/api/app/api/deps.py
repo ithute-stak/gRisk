@@ -40,6 +40,8 @@ WRITE_ROLE_BY_PREFIX: tuple[tuple[str, set[str]], ...] = (
     ("/api/v1/guarantees", {"admin", "broker", "risk"}),
     ("/api/v1/risk", {"admin", "risk"}),
     ("/api/v1/finance", {"admin", "finance"}),
+    ("/api/v1/documents", {"admin", "broker", "claims", "medical", "finance", "risk"}),
+    ("/api/v1/partners", {"admin", "broker", "risk"}),
 )
 
 
