@@ -35,6 +35,7 @@ from app.realtime.manager import manager
 settings = get_settings()
 request_logger = logging.getLogger("grisk.request")
 request_logger.setLevel(logging.INFO)
+SESSION_COOKIE_NAME = "grisk_session"
 
 
 @asynccontextmanager
@@ -134,8 +135,18 @@ async def root() -> dict:
     }
 
 
+def _websocket_origin_allowed(websocket: WebSocket) -> bool:
+    if settings.environment.lower() != "production":
+        return True
+    origin = websocket.headers.get("origin")
+    return bool(origin and origin in settings.cors_origin_list)
+
+
 async def _websocket_user(websocket: WebSocket) -> User | None:
-    token = websocket.query_params.get("access_token")
+    token = websocket.cookies.get(SESSION_COOKIE_NAME)
+    if not token and settings.environment.lower() != "production":
+        # Development-only compatibility for non-browser WebSocket clients.
+        token = websocket.query_params.get("access_token")
     if not token:
         return None
     try:
@@ -163,6 +174,10 @@ def _websocket_channel_allowed(user: User, channel: str) -> bool:
 
 @app.websocket("/ws/{channel}")
 async def websocket_endpoint(websocket: WebSocket, channel: str) -> None:
+    if not _websocket_origin_allowed(websocket):
+        await websocket.close(code=4403, reason="Origin not allowed")
+        return
+
     user = await _websocket_user(websocket)
     if user is None:
         await websocket.close(code=4401, reason="Authentication required")
