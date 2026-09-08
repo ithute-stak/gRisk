@@ -4,7 +4,7 @@ from redis.exceptions import RedisError
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.redis import redis_client
+from app.core.redis import redis_connection
 from app.db.session import AsyncSessionLocal
 
 router = APIRouter(prefix="/health", tags=["health"])
@@ -22,7 +22,8 @@ async def _service_status() -> tuple[bool, bool]:
         db_ok = False
 
     try:
-        redis_ok = bool(await redis_client.ping())
+        async with redis_connection() as client:
+            redis_ok = bool(await client.ping())
     except RedisError:
         redis_ok = False
 
