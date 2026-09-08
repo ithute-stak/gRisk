@@ -1,3 +1,4 @@
+import json
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -25,6 +26,7 @@ from app.realtime.manager import manager
 
 settings = get_settings()
 request_logger = logging.getLogger("grisk.request")
+request_logger.setLevel(logging.INFO)
 
 
 @asynccontextmanager
@@ -50,6 +52,20 @@ app.add_middleware(
 )
 
 
+def _request_log(event: str, request_id: str, request: Request, **values) -> str:
+    return json.dumps(
+        {
+            "event": event,
+            "request_id": request_id,
+            "method": request.method,
+            "path": request.url.path,
+            **values,
+        },
+        separators=(",", ":"),
+        default=str,
+    )
+
+
 @app.middleware("http")
 async def operational_middleware(request: Request, call_next):
     request_id = uuid.uuid4().hex
@@ -57,15 +73,13 @@ async def operational_middleware(request: Request, call_next):
     try:
         response = await call_next(request)
     except Exception:
+        duration_ms = round((perf_counter() - started) * 1000, 2)
         request_logger.exception(
-            "request_failed request_id=%s method=%s path=%s",
-            request_id,
-            request.method,
-            request.url.path,
+            _request_log("request_failed", request_id, request, duration_ms=duration_ms)
         )
         raise
 
-    duration_ms = (perf_counter() - started) * 1000
+    duration_ms = round((perf_counter() - started) * 1000, 2)
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
@@ -75,12 +89,13 @@ async def operational_middleware(request: Request, call_next):
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
     request_logger.info(
-        "request_completed request_id=%s method=%s path=%s status=%s duration_ms=%.2f",
-        request_id,
-        request.method,
-        request.url.path,
-        response.status_code,
-        duration_ms,
+        _request_log(
+            "request_completed",
+            request_id,
+            request,
+            status=response.status_code,
+            duration_ms=duration_ms,
+        )
     )
     return response
 
