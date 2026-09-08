@@ -3,11 +3,15 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 InvoiceType = Literal["premium", "medical", "service_fee", "guarantee_fee", "other"]
 InvoiceStatus = Literal["draft", "issued", "partially_paid", "paid", "cancelled"]
 PaymentMethod = Literal["cash", "bank_transfer", "card", "mobile_money", "cheque", "other"]
+
+
+def _money(value: Decimal) -> str:
+    return format(value, ".2f")
 
 
 class InvoiceCreate(BaseModel):
@@ -62,6 +66,10 @@ class PaymentResponse(BaseModel):
     received_by_user_id: uuid.UUID | None
     created_at: datetime
 
+    @field_serializer("amount")
+    def serialize_amount(self, value: Decimal) -> str:
+        return _money(value)
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -81,6 +89,10 @@ class InvoiceSummary(BaseModel):
     due_date: date
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer("amount_due", "amount_paid")
+    def serialize_amounts(self, value: Decimal) -> str:
+        return _money(value)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -105,3 +117,7 @@ class FinanceDashboardResponse(BaseModel):
     total_invoiced: Decimal
     total_received: Decimal
     outstanding_balance: Decimal
+
+    @field_serializer("total_invoiced", "total_received", "outstanding_balance")
+    def serialize_amounts(self, value: Decimal) -> str:
+        return _money(value)
