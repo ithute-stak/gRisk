@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     cors_origins: str = "http://localhost:8080,http://localhost:5000"
 
+    document_storage_path: str = "/data/documents"
+    document_max_upload_mb: int = 20
+
     bootstrap_admin_email: str | None = None
     bootstrap_admin_password: str | None = None
     bootstrap_admin_name: str = "gRisk Administrator"
@@ -39,7 +42,9 @@ class Settings(BaseSettings):
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
 
     @model_validator(mode="after")
-    def validate_production_settings(self):
+    def validate_settings(self):
+        if self.document_max_upload_mb < 1 or self.document_max_upload_mb > 100:
+            raise ValueError("GRISK_DOCUMENT_MAX_UPLOAD_MB must be between 1 and 100")
         if self.environment.lower() != "production":
             return self
         if self.secret_key == "change-me" or len(self.secret_key) < 32:
