@@ -66,7 +66,13 @@ def _serialize(document: StudioDocument, *, can_edit: bool = True) -> dict:
     }
 
 
-async def _access(session: DbSession, user: User, document_id: uuid.UUID, *, write: bool = False) -> tuple[StudioDocument, bool]:
+async def _access(
+    session: DbSession,
+    user: User,
+    document_id: uuid.UUID,
+    *,
+    write: bool = False,
+) -> tuple[StudioDocument, bool]:
     document = await session.get(StudioDocument, document_id)
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -83,7 +89,10 @@ async def _access(session: DbSession, user: User, document_id: uuid.UUID, *, wri
     if collaboration:
         can_edit = collaboration.permission == "edit"
         if write and not can_edit:
-            raise HTTPException(status_code=403, detail="This document was shared with view-only access")
+            raise HTTPException(
+                status_code=403,
+                detail="This document was shared with view-only access",
+            )
         return document, can_edit
     if document.visibility == "team" and not write:
         return document, False
@@ -91,8 +100,15 @@ async def _access(session: DbSession, user: User, document_id: uuid.UUID, *, wri
 
 
 @router.get("")
-async def list_documents(session: DbSession, user: CurrentUser, q: str = "", document_status: str = "") -> list[dict]:
-    collaborator_ids = select(StudioCollaborator.document_id).where(StudioCollaborator.user_id == user.id)
+async def list_documents(
+    session: DbSession,
+    user: CurrentUser,
+    q: str = "",
+    document_status: str = "",
+) -> list[dict]:
+    collaborator_ids = select(StudioCollaborator.document_id).where(
+        StudioCollaborator.user_id == user.id
+    )
     access_filter = or_(
         StudioDocument.owner_user_id == user.id,
         StudioDocument.visibility == "team",
@@ -101,12 +117,17 @@ async def list_documents(session: DbSession, user: CurrentUser, q: str = "", doc
     conditions = [access_filter]
     if q.strip():
         token = f"%{q.strip()}%"
-        conditions.append(or_(StudioDocument.title.ilike(token), StudioDocument.plain_text.ilike(token)))
+        conditions.append(
+            or_(StudioDocument.title.ilike(token), StudioDocument.plain_text.ilike(token))
+        )
     if document_status.strip():
         conditions.append(StudioDocument.status == document_status.strip())
     rows = (
         await session.execute(
-            select(StudioDocument).where(and_(*conditions)).order_by(StudioDocument.updated_at.desc()).limit(300)
+            select(StudioDocument)
+            .where(and_(*conditions))
+            .order_by(StudioDocument.updated_at.desc())
+            .limit(300)
         )
     ).scalars().all()
     result: list[dict] = []
@@ -127,7 +148,12 @@ async def list_documents(session: DbSession, user: CurrentUser, q: str = "", doc
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_document(payload: StudioCreate, request: Request, session: DbSession, user: CurrentUser) -> dict:
+async def create_document(
+    payload: StudioCreate,
+    request: Request,
+    session: DbSession,
+    user: CurrentUser,
+) -> dict:
     document = StudioDocument(
         owner_user_id=user.id,
         title=payload.title.strip(),
@@ -155,7 +181,11 @@ async def create_document(payload: StudioCreate, request: Request, session: DbSe
 
 
 @router.get("/{document_id}")
-async def get_document(document_id: uuid.UUID, session: DbSession, user: CurrentUser) -> dict:
+async def get_document(
+    document_id: uuid.UUID,
+    session: DbSession,
+    user: CurrentUser,
+) -> dict:
     document, can_edit = await _access(session, user, document_id)
     return _serialize(document, can_edit=can_edit)
 
@@ -170,8 +200,19 @@ async def update_document(
 ) -> dict:
     document, _ = await _access(session, user, document_id, write=True)
     if payload.expected_version is not None and payload.expected_version != document.version:
-        raise HTTPException(status_code=409, detail="This document changed elsewhere. Reload before saving again.")
-    for field in ("title", "style_key", "html_content", "plain_text", "settings", "visibility", "status"):
+        raise HTTPException(
+            status_code=409,
+            detail="This document changed elsewhere. Reload before saving again.",
+        )
+    for field in (
+        "title",
+        "style_key",
+        "html_content",
+        "plain_text",
+        "settings",
+        "visibility",
+        "status",
+    ):
         value = getattr(payload, field)
         if value is not None:
             if field == "title":
@@ -193,7 +234,12 @@ async def update_document(
 
 
 @router.delete("/{document_id}", status_code=204)
-async def delete_document(document_id: uuid.UUID, request: Request, session: DbSession, user: CurrentUser) -> Response:
+async def delete_document(
+    document_id: uuid.UUID,
+    request: Request,
+    session: DbSession,
+    user: CurrentUser,
+) -> Response:
     document, _ = await _access(session, user, document_id, write=True)
     if not user.is_superuser and document.owner_user_id != user.id:
         raise HTTPException(status_code=403, detail="Only the document owner can delete it")
@@ -212,7 +258,11 @@ async def delete_document(document_id: uuid.UUID, request: Request, session: DbS
 
 
 @router.post("/{document_id}/revisions", status_code=201)
-async def checkpoint(document_id: uuid.UUID, session: DbSession, user: CurrentUser) -> dict:
+async def checkpoint(
+    document_id: uuid.UUID,
+    session: DbSession,
+    user: CurrentUser,
+) -> dict:
     document, _ = await _access(session, user, document_id, write=True)
     revision = StudioRevision(
         document_id=document.id,
@@ -248,11 +298,17 @@ async def checkpoint(document_id: uuid.UUID, session: DbSession, user: CurrentUs
 
 
 @router.get("/{document_id}/revisions")
-async def revisions(document_id: uuid.UUID, session: DbSession, user: CurrentUser) -> list[dict]:
+async def revisions(
+    document_id: uuid.UUID,
+    session: DbSession,
+    user: CurrentUser,
+) -> list[dict]:
     await _access(session, user, document_id)
     rows = (
         await session.execute(
-            select(StudioRevision).where(StudioRevision.document_id == document_id).order_by(StudioRevision.version.desc())
+            select(StudioRevision)
+            .where(StudioRevision.document_id == document_id)
+            .order_by(StudioRevision.version.desc())
         )
     ).scalars().all()
     return [
@@ -270,7 +326,11 @@ async def revisions(document_id: uuid.UUID, session: DbSession, user: CurrentUse
 
 
 @router.get("/{document_id}/collaborators")
-async def collaborators(document_id: uuid.UUID, session: DbSession, user: CurrentUser) -> list[dict]:
+async def collaborators(
+    document_id: uuid.UUID,
+    session: DbSession,
+    user: CurrentUser,
+) -> list[dict]:
     document, _ = await _access(session, user, document_id)
     if not user.is_superuser and document.owner_user_id != user.id:
         raise HTTPException(status_code=403, detail="Only the owner can manage sharing")
@@ -283,7 +343,12 @@ async def collaborators(document_id: uuid.UUID, session: DbSession, user: Curren
         )
     ).all()
     return [
-        {"user_id": str(collab.user_id), "name": target.full_name, "email": target.email, "permission": collab.permission}
+        {
+            "user_id": str(collab.user_id),
+            "name": target.full_name,
+            "email": target.email,
+            "permission": collab.permission,
+        }
         for collab, target in rows
     ]
 
@@ -315,10 +380,19 @@ async def add_collaborator(
         existing.permission = payload.permission
         collaboration = existing
     else:
-        collaboration = StudioCollaborator(document_id=document_id, user_id=payload.user_id, permission=payload.permission)
+        collaboration = StudioCollaborator(
+            document_id=document_id,
+            user_id=payload.user_id,
+            permission=payload.permission,
+        )
         session.add(collaboration)
     await session.commit()
-    return {"user_id": str(target.id), "name": target.full_name, "email": target.email, "permission": collaboration.permission}
+    return {
+        "user_id": str(target.id),
+        "name": target.full_name,
+        "email": target.email,
+        "permission": collaboration.permission,
+    }
 
 
 @router.delete("/{document_id}/collaborators/{target_user_id}", status_code=204)
@@ -343,9 +417,14 @@ async def remove_collaborator(
 
 def _clean_html_for_reportlab(html: str) -> list[str]:
     text = html
-    text = re.sub(r"<\s*br\s*/?>", "\n", text, flags=re.I)
-    text = re.sub(r"</\s*(p|div|h[1-6]|li|tr)\s*>", "\n", text, flags=re.I)
-    text = re.sub(r"<\s*li[^>]*>", "• ", text, flags=re.I)
+    text = re.sub(r"<\s*br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"</\s*(p|div|h[1-6]|li|tr)\s*>",
+        "\n",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"<\s*li[^>]*>", "• ", text, flags=re.IGNORECASE)
     text = re.sub(r"<[^>]+>", "", text)
     text = unescape(text).replace("\xa0", " ")
     return [line.strip() for line in text.splitlines() if line.strip()]
@@ -380,11 +459,19 @@ def _pdf_for(document: StudioDocument) -> BytesIO:
     )
     story = []
     if settings.get("brand_header", True):
-        story.extend([
-            Paragraph('<font color="#F47A20"><b>G</b></font>  <b>GUARDRISK</b>', styles["Title"]),
-            Paragraph("Insurance · Medical Aid · Bonds & Guarantees · Risk Management", styles["Normal"]),
-            Spacer(1, 5 * mm),
-        ])
+        story.extend(
+            [
+                Paragraph(
+                    '<font color="#F47A20"><b>G</b></font>  <b>GUARDRISK</b>',
+                    styles["Title"],
+                ),
+                Paragraph(
+                    "Insurance · Medical Aid · Bonds & Guarantees · Risk Management",
+                    styles["Normal"],
+                ),
+                Spacer(1, 5 * mm),
+            ]
+        )
     for line in _clean_html_for_reportlab(document.html_content):
         if line == "[[PAGE_BREAK]]":
             story.append(PageBreak())
@@ -396,9 +483,16 @@ def _pdf_for(document: StudioDocument) -> BytesIO:
 
 
 @router.get("/{document_id}/export/pdf")
-async def export_pdf(document_id: uuid.UUID, session: DbSession, user: CurrentUser) -> StreamingResponse:
+async def export_pdf(
+    document_id: uuid.UUID,
+    session: DbSession,
+    user: CurrentUser,
+) -> StreamingResponse:
     document, _ = await _access(session, user, document_id)
-    safe = re.sub(r"[^A-Za-z0-9_-]+", "_", document.title).strip("_") or "guardrisk-document"
+    safe = (
+        re.sub(r"[^A-Za-z0-9_-]+", "_", document.title).strip("_")
+        or "guardrisk-document"
+    )
     return StreamingResponse(
         _pdf_for(document),
         media_type="application/pdf",
@@ -407,10 +501,20 @@ async def export_pdf(document_id: uuid.UUID, session: DbSession, user: CurrentUs
 
 
 @router.get("/{document_id}/export/word")
-async def export_word(document_id: uuid.UUID, session: DbSession, user: CurrentUser) -> Response:
+async def export_word(
+    document_id: uuid.UUID,
+    session: DbSession,
+    user: CurrentUser,
+) -> Response:
     document, _ = await _access(session, user, document_id)
-    safe = re.sub(r"[^A-Za-z0-9_-]+", "_", document.title).strip("_") or "guardrisk-document"
-    html = f'''<!doctype html><html><head><meta charset="utf-8"><title>{document.title}</title></head><body>{document.html_content}</body></html>'''
+    safe = (
+        re.sub(r"[^A-Za-z0-9_-]+", "_", document.title).strip("_")
+        or "guardrisk-document"
+    )
+    html = (
+        '<!doctype html><html><head><meta charset="utf-8"><title>'
+        f"{document.title}</title></head><body>{document.html_content}</body></html>"
+    )
     return Response(
         content=html,
         media_type="application/msword",
