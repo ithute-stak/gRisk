@@ -15,7 +15,6 @@ from app.services.studio_letterhead import (
 
 CUSTOM_ADDRESS = "LNDC Centre, Ground Floor, Shop No. 12"
 CUSTOM_DATE = "09 September 2026, 11:16"
-CUSTOM_CODE = "GRK-00001"
 CUSTOM_RECIPIENT = "Mpho Mosotho"
 CUSTOM_COMPANY = "Example Company"
 CUSTOM_SUBJECT = "Medical Aid Confirmation"
@@ -48,7 +47,7 @@ def _document() -> StudioDocument:
             "margin_left_mm": 12,
             "brand_header": False,
             "letterhead_date_time": CUSTOM_DATE,
-            "letterhead_code": CUSTOM_CODE,
+            "letterhead_code": "GRK-LEGACY",
             "letterhead_recipient": CUSTOM_RECIPIENT,
             "letterhead_company": CUSTOM_COMPANY,
             "letterhead_address": CUSTOM_ADDRESS,
@@ -76,13 +75,13 @@ def test_phone_normalization_always_adds_lesotho_country_code() -> None:
     assert normalize_lesotho_phone("+266 5939 5332") == "+266 5939 5332"
 
 
-def test_official_settings_lock_stationery_on_and_seed_editable_details() -> None:
+def test_official_settings_remove_legacy_code_and_keep_editable_details() -> None:
     document = _document()
     settings = official_settings(document.settings, document)
     assert settings["brand_header"] is True
-    assert settings["official_letterhead"] == "guardrisk_editable_v4"
+    assert settings["official_letterhead"] == "guardrisk_editable_v5_no_code"
+    assert "letterhead_code" not in settings
     assert settings["letterhead_date_time"] == CUSTOM_DATE
-    assert settings["letterhead_code"] == CUSTOM_CODE
     assert settings["letterhead_recipient"] == CUSTOM_RECIPIENT
     assert settings["letterhead_company"] == CUSTOM_COMPANY
     assert settings["letterhead_subject"] == CUSTOM_SUBJECT
@@ -92,15 +91,14 @@ def test_official_settings_lock_stationery_on_and_seed_editable_details() -> Non
     assert settings["letterhead_phone_2"] == "+266 6272 0488"
 
 
-def test_missing_code_gets_stable_document_code() -> None:
+def test_stationery_values_have_no_code_field() -> None:
     document = _document()
-    document.settings = {}
     details = stationery_values(document.settings, document)
-    assert details["code"] == "GRK-41741"
-    assert details["date_time"]
+    assert "code" not in details
+    assert details["date_time"] == CUSTOM_DATE
 
 
-def test_pdf_repeats_custom_editable_stationery_on_every_page() -> None:
+def test_pdf_repeats_custom_editable_stationery_without_code() -> None:
     payload = export_pdf(_document())
     assert payload.startswith(b"%PDF")
     reader = PdfReader(BytesIO(payload))
@@ -110,9 +108,10 @@ def test_pdf_repeats_custom_editable_stationery_on_every_page() -> None:
         text = page.extract_text() or ""
         assert "GUARDRISK" in text
         assert "DOCUMENT STUDIO" not in text
+        assert "Code:" not in text
+        assert "GRK-" not in text
         assert CUSTOM_TAGLINE.upper() in text
         assert CUSTOM_DATE in text
-        assert CUSTOM_CODE in text
         assert CUSTOM_RECIPIENT in text
         assert CUSTOM_COMPANY in text
         assert CUSTOM_SUBJECT in text
@@ -128,7 +127,7 @@ def test_pdf_repeats_custom_editable_stationery_on_every_page() -> None:
     assert "Second page body content." in complete_text
 
 
-def test_docx_uses_all_custom_template_fields_and_normalized_numbers() -> None:
+def test_docx_uses_custom_template_fields_without_code() -> None:
     payload = export_docx(_document())
     assert payload.startswith(b"PK")
     word = WordDocument(BytesIO(payload))
@@ -139,9 +138,10 @@ def test_docx_uses_all_custom_template_fields_and_normalized_numbers() -> None:
         footer_text = _container_text(section.footer)
         assert "GUARDRISK" in header_text
         assert "DOCUMENT STUDIO" not in header_text
+        assert "Code:" not in header_text
+        assert "GRK-" not in header_text
         assert CUSTOM_TAGLINE.upper() in header_text
         assert CUSTOM_DATE in header_text
-        assert CUSTOM_CODE in header_text
         assert CUSTOM_RECIPIENT in header_text
         assert CUSTOM_COMPANY in header_text
         assert CUSTOM_SUBJECT in header_text
