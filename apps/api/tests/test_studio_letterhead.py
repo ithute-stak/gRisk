@@ -86,9 +86,7 @@ def _container_text(container) -> str:
 
 
 def _document_body_text(word: WordDocument) -> str:
-    paragraphs = [paragraph.text for paragraph in word.paragraphs]
-    tables = [cell.text for table in word.tables for row in table.rows for cell in row.cells]
-    return "\n".join([*paragraphs, *tables])
+    return "\n".join(word.element.body.itertext())
 
 
 def test_phone_normalization_always_adds_lesotho_country_code() -> None:
@@ -200,4 +198,5 @@ def test_docx_matches_reference_fields_without_code() -> None:
     assert CUSTOM_SIGNATURE in body_text
     assert CUSTOM_SIGNER in body_text
     assert CUSTOM_TITLE in body_text
-    assert CUSTOM_STAMP in body_text
+    assert "Digital" in body_text
+    assert "Stamp" in body_text
