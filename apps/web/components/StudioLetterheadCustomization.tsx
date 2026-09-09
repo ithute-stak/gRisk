@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { getStudioDocument, saveStudioDocument, type StudioDocument, type StudioSettings } from "@/lib/studio";
 
 const defaults: StudioSettings = {
-  letterhead_address: "LNDC Centre, Ground Floor, Shop No. ____",
+  letterhead_address_line_1: "LNDC Centre, Ground Floor,",
+  letterhead_address_line_2: "Shop No. ____,",
+  letterhead_address_line_3: "Maseru 100, Lesotho",
   letterhead_phone_1: "+266 2232 2537",
   letterhead_phone_2: "+266 6272 0488",
   letterhead_email: "info@guardrisk.co.ls",
@@ -16,6 +18,12 @@ const defaults: StudioSettings = {
   letterhead_tagline: "YOUR LINK TO PREMIER HEALTHCARE",
   letterhead_recipient: "Recipient Name",
   letterhead_company: "Company Name",
+  letterhead_closing_line_1: "Kind regards,",
+  letterhead_closing_line_2: "For and on behalf of Guardrisk.",
+  letterhead_signer_name: "Your Name",
+  letterhead_signer_title: "Your Title",
+  letterhead_signature_label: "Click here to digitally sign",
+  letterhead_stamp_label: "Digital Stamp",
 };
 
 function normalizePhone(value: string) {
@@ -41,14 +49,43 @@ function formatMaseruDateTime(date = new Date()) {
   return `${value.day} ${value.month} ${value.year}, ${value.hour}:${value.minute}`;
 }
 
+function legacyAddressLines(settings: StudioSettings) {
+  const legacy = (settings.letterhead_address || "").split(/\r?\n|,\s*/).map((line) => line.trim()).filter(Boolean);
+  return {
+    line1: settings.letterhead_address_line_1 || legacy[0] || defaults.letterhead_address_line_1,
+    line2: settings.letterhead_address_line_2 || legacy[1] || defaults.letterhead_address_line_2,
+    line3: settings.letterhead_address_line_3 || legacy.slice(2).join(", ") || defaults.letterhead_address_line_3,
+  };
+}
+
 function withDefaults(settings: StudioSettings = {}): StudioSettings {
+  const address = legacyAddressLines(settings);
   return {
     ...defaults,
     ...settings,
+    letterhead_address_line_1: address.line1,
+    letterhead_address_line_2: address.line2,
+    letterhead_address_line_3: address.line3,
     letterhead_date_time: settings.letterhead_date_time || formatMaseruDateTime(),
     letterhead_phone_1: normalizePhone(settings.letterhead_phone_1 || defaults.letterhead_phone_1 || ""),
     letterhead_phone_2: normalizePhone(settings.letterhead_phone_2 || defaults.letterhead_phone_2 || ""),
   };
+}
+
+function LocationIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s7-6.5 7-13A7 7 0 1 0 5 9c0 6.5 7 13 7 13Z" fill="none" stroke="currentColor" strokeWidth="2"/><circle cx="12" cy="9" r="2.7" fill="currentColor"/></svg>;
+}
+
+function PhoneIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.1 3.5 4.8 5.2c-.8.6-1 1.7-.6 2.6 2.3 5.4 6.6 9.7 12 12 .9.4 2 .2 2.6-.6l1.7-2.3c.5-.7.4-1.7-.3-2.3l-3-2.4c-.7-.5-1.6-.5-2.2.1l-1.4 1.4a15.1 15.1 0 0 1-3.3-3.3L11.7 9c.6-.6.6-1.6.1-2.2l-2.4-3c-.6-.7-1.6-.8-2.3-.3Z" fill="currentColor"/></svg>;
+}
+
+function MailIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1.5" fill="none" stroke="currentColor" strokeWidth="2"/><path d="m4 7 8 6 8-6" fill="none" stroke="currentColor" strokeWidth="2"/></svg>;
+}
+
+function PenIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.4-10.4-3.2-3.2L5 15.8 4 20Zm10.3-13.5 3.2 3.2M14.9 4.9l1.3-1.3a1.8 1.8 0 0 1 2.6 0l1.6 1.6a1.8 1.8 0 0 1 0 2.6L19 9.1" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>;
 }
 
 export default function StudioLetterheadCustomization({ documentId }: { documentId: string }) {
@@ -80,6 +117,12 @@ export default function StudioLetterheadCustomization({ documentId }: { document
     setDirty(true);
   }
 
+  const addressText = useMemo(() => [
+    draft.letterhead_address_line_1,
+    draft.letterhead_address_line_2,
+    draft.letterhead_address_line_3,
+  ].filter(Boolean).join("\n"), [draft.letterhead_address_line_1, draft.letterhead_address_line_2, draft.letterhead_address_line_3]);
+
   async function save() {
     if (!record?.can_edit) return;
     setSaving(true);
@@ -92,6 +135,7 @@ export default function StudioLetterheadCustomization({ documentId }: { document
         ...(latest.settings || {}),
         ...draft,
         brand_header: true,
+        letterhead_address: addressText,
         letterhead_phone_1: normalizePhone(draft.letterhead_phone_1 || ""),
         letterhead_phone_2: normalizePhone(draft.letterhead_phone_2 || ""),
       };
@@ -113,13 +157,11 @@ export default function StudioLetterheadCustomization({ documentId }: { document
         <div className="guardrisk-brand-name">GUARDRISK</div>
       </div>
 
-      <input
-        className="guardrisk-tagline-input"
-        aria-label="Letterhead tagline"
-        disabled={!editable}
-        value={draft.letterhead_tagline || ""}
-        onChange={(event) => setField("letterhead_tagline", event.target.value)}
-      />
+      <div className="guardrisk-tagline-row">
+        <i />
+        <input aria-label="Letterhead tagline" disabled={!editable} value={draft.letterhead_tagline || ""} onChange={(event) => setField("letterhead_tagline", event.target.value)} />
+        <i />
+      </div>
 
       <div className="guardrisk-letter-meta">
         <label><b>Date:</b><input disabled={!editable} value={draft.letterhead_date_time || ""} onChange={(event) => setField("letterhead_date_time", event.target.value)} /></label>
@@ -127,20 +169,60 @@ export default function StudioLetterheadCustomization({ documentId }: { document
         <label><b>Company:</b><input disabled={!editable} value={draft.letterhead_company || ""} onChange={(event) => setField("letterhead_company", event.target.value)} /></label>
       </div>
 
-      <label className="guardrisk-letterhead-address">
+      <div className="guardrisk-letterhead-address">
         <strong>Address:</strong>
-        <textarea disabled={!editable} value={draft.letterhead_address || ""} onChange={(event) => setField("letterhead_address", event.target.value)} />
-      </label>
+        <div>
+          <input disabled={!editable} value={draft.letterhead_address_line_1 || ""} onChange={(event) => setField("letterhead_address_line_1", event.target.value)} />
+          <input disabled={!editable} value={draft.letterhead_address_line_2 || ""} onChange={(event) => setField("letterhead_address_line_2", event.target.value)} />
+          <input disabled={!editable} value={draft.letterhead_address_line_3 || ""} onChange={(event) => setField("letterhead_address_line_3", event.target.value)} />
+        </div>
+      </div>
 
       <label className="guardrisk-subject-line">
         <b>RE:</b>
         <input disabled={!editable} value={draft.letterhead_subject || ""} onChange={(event) => setField("letterhead_subject", event.target.value)} />
       </label>
 
+      <section className="guardrisk-signature-area">
+        <div className="guardrisk-closing-copy">
+          <input disabled={!editable} value={draft.letterhead_closing_line_1 || ""} onChange={(event) => setField("letterhead_closing_line_1", event.target.value)} />
+          <input disabled={!editable} value={draft.letterhead_closing_line_2 || ""} onChange={(event) => setField("letterhead_closing_line_2", event.target.value)} />
+        </div>
+        <div className="guardrisk-signature-box">
+          <span className="guardrisk-signature-pen"><PenIcon /></span>
+          <span className="guardrisk-signature-divider" />
+          <input disabled={!editable} value={draft.letterhead_signature_label || ""} onChange={(event) => setField("letterhead_signature_label", event.target.value)} />
+        </div>
+        <div className="guardrisk-signer-fields">
+          <input className="guardrisk-signer-name" disabled={!editable} value={draft.letterhead_signer_name || ""} onChange={(event) => setField("letterhead_signer_name", event.target.value)} />
+          <input disabled={!editable} value={draft.letterhead_signer_title || ""} onChange={(event) => setField("letterhead_signer_title", event.target.value)} />
+        </div>
+      </section>
+
+      <label className="guardrisk-digital-stamp">
+        <textarea disabled={!editable} value={draft.letterhead_stamp_label || ""} onChange={(event) => setField("letterhead_stamp_label", event.target.value)} />
+      </label>
+
       <div className="guardrisk-letterhead-footer-contact">
-        <label><b>⌖</b><textarea disabled={!editable} value={draft.letterhead_address || ""} onChange={(event) => setField("letterhead_address", event.target.value)} /></label>
-        <label><b>☎</b><span><input disabled={!editable} value={draft.letterhead_phone_1 || ""} onChange={(event) => setField("letterhead_phone_1", event.target.value)} onBlur={() => setField("letterhead_phone_1", normalizePhone(draft.letterhead_phone_1 || ""))} /><input disabled={!editable} value={draft.letterhead_phone_2 || ""} onChange={(event) => setField("letterhead_phone_2", event.target.value)} onBlur={() => setField("letterhead_phone_2", normalizePhone(draft.letterhead_phone_2 || ""))} /></span></label>
-        <label><b>✉</b><input disabled={!editable} value={draft.letterhead_email || ""} onChange={(event) => setField("letterhead_email", event.target.value)} /></label>
+        <label className="guardrisk-footer-address">
+          <b><LocationIcon /></b>
+          <span>
+            <input disabled={!editable} value={draft.letterhead_address_line_1 || ""} onChange={(event) => setField("letterhead_address_line_1", event.target.value)} />
+            <input disabled={!editable} value={draft.letterhead_address_line_2 || ""} onChange={(event) => setField("letterhead_address_line_2", event.target.value)} />
+            <input disabled={!editable} value={draft.letterhead_address_line_3 || ""} onChange={(event) => setField("letterhead_address_line_3", event.target.value)} />
+          </span>
+        </label>
+        <label>
+          <b><PhoneIcon /></b>
+          <span>
+            <input disabled={!editable} value={draft.letterhead_phone_1 || ""} onChange={(event) => setField("letterhead_phone_1", event.target.value)} onBlur={() => setField("letterhead_phone_1", normalizePhone(draft.letterhead_phone_1 || ""))} />
+            <input disabled={!editable} value={draft.letterhead_phone_2 || ""} onChange={(event) => setField("letterhead_phone_2", event.target.value)} onBlur={() => setField("letterhead_phone_2", normalizePhone(draft.letterhead_phone_2 || ""))} />
+          </span>
+        </label>
+        <label>
+          <b><MailIcon /></b>
+          <input disabled={!editable} value={draft.letterhead_email || ""} onChange={(event) => setField("letterhead_email", event.target.value)} />
+        </label>
       </div>
 
       <div className="guardrisk-letterhead-footer-labels">
@@ -159,14 +241,22 @@ export default function StudioLetterheadCustomization({ documentId }: { document
         {dirty && <button className="button small" disabled={!editable || saving} onClick={() => void save()}>{saving ? "Saving…" : "Save fields"}</button>}
       </div>
       {open && <div className="studio-letterhead-customizer-panel">
-        <strong>Editable letter template</strong>
-        <small>Every field below is saved with this document and used in the editor preview, PDF and Word export. Phone numbers are normalized to +266.</small>
+        <strong>Editable Guardrisk letter template</strong>
+        <small>The approved layout stays fixed. These values are saved per document and used in the editor preview, PDF and Word export. Phone numbers are normalized to +266.</small>
         <label>Date & time<input value={draft.letterhead_date_time || ""} onChange={(event) => setField("letterhead_date_time", event.target.value)} /></label>
         <label>Recipient<input value={draft.letterhead_recipient || ""} onChange={(event) => setField("letterhead_recipient", event.target.value)} /></label>
         <label>Company<input value={draft.letterhead_company || ""} onChange={(event) => setField("letterhead_company", event.target.value)} /></label>
-        <label>Address<textarea value={draft.letterhead_address || ""} onChange={(event) => setField("letterhead_address", event.target.value)} placeholder="LNDC Centre, Ground Floor, Shop No. ..." /></label>
+        <label>Address line 1<input value={draft.letterhead_address_line_1 || ""} onChange={(event) => setField("letterhead_address_line_1", event.target.value)} /></label>
+        <label>Address line 2<input value={draft.letterhead_address_line_2 || ""} onChange={(event) => setField("letterhead_address_line_2", event.target.value)} /></label>
+        <label>Address line 3<input value={draft.letterhead_address_line_3 || ""} onChange={(event) => setField("letterhead_address_line_3", event.target.value)} /></label>
         <label>Tagline<input value={draft.letterhead_tagline || ""} onChange={(event) => setField("letterhead_tagline", event.target.value)} /></label>
         <label>Subject<input value={draft.letterhead_subject || ""} onChange={(event) => setField("letterhead_subject", event.target.value)} /></label>
+        <label>Closing line 1<input value={draft.letterhead_closing_line_1 || ""} onChange={(event) => setField("letterhead_closing_line_1", event.target.value)} /></label>
+        <label>Closing line 2<input value={draft.letterhead_closing_line_2 || ""} onChange={(event) => setField("letterhead_closing_line_2", event.target.value)} /></label>
+        <label>Signature prompt<input value={draft.letterhead_signature_label || ""} onChange={(event) => setField("letterhead_signature_label", event.target.value)} /></label>
+        <label>Signer name<input value={draft.letterhead_signer_name || ""} onChange={(event) => setField("letterhead_signer_name", event.target.value)} /></label>
+        <label>Signer title<input value={draft.letterhead_signer_title || ""} onChange={(event) => setField("letterhead_signer_title", event.target.value)} /></label>
+        <label>Digital stamp text<input value={draft.letterhead_stamp_label || ""} onChange={(event) => setField("letterhead_stamp_label", event.target.value)} /></label>
         <label>Phone 1<input value={draft.letterhead_phone_1 || ""} onChange={(event) => setField("letterhead_phone_1", event.target.value)} onBlur={() => setField("letterhead_phone_1", normalizePhone(draft.letterhead_phone_1 || ""))} /></label>
         <label>Phone 2<input value={draft.letterhead_phone_2 || ""} onChange={(event) => setField("letterhead_phone_2", event.target.value)} onBlur={() => setField("letterhead_phone_2", normalizePhone(draft.letterhead_phone_2 || ""))} /></label>
         <label>Email<input value={draft.letterhead_email || ""} onChange={(event) => setField("letterhead_email", event.target.value)} /></label>
