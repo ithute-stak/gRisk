@@ -13,18 +13,26 @@ from app.services.studio_letterhead import (
     stationery_values,
 )
 
-CUSTOM_ADDRESS = "LNDC Centre, Ground Floor, Shop No. 12"
 CUSTOM_DATE = "09 September 2026, 11:16"
 CUSTOM_RECIPIENT = "Mpho Mosotho"
 CUSTOM_COMPANY = "Example Company"
 CUSTOM_SUBJECT = "Medical Aid Confirmation"
 CUSTOM_TAGLINE = "Your Link to Premier Healthcare"
+CUSTOM_ADDRESS_1 = "LNDC Centre, Ground Floor,"
+CUSTOM_ADDRESS_2 = "Shop No. 12,"
+CUSTOM_ADDRESS_3 = "Maseru 100, Lesotho"
+CUSTOM_CLOSING_1 = "Kind regards,"
+CUSTOM_CLOSING_2 = "For and on behalf of Guardrisk."
+CUSTOM_SIGNER = "M. Mosotho"
+CUSTOM_TITLE = "Authorised Signatory"
+CUSTOM_SIGNATURE = "Click here to digitally sign"
+CUSTOM_STAMP = "Digital Stamp"
 DOCUMENT_ID = uuid.UUID("12345678-1234-5678-1234-56781234abcd")
 
 
 def _document() -> StudioDocument:
     html = """
-    <h1>Official correspondence</h1>
+    <p>Dear Mpho Mosotho,</p>
     <p>First page body content.</p>
     <div data-page-break="true"></div>
     <p>Second page body content.</p>
@@ -37,7 +45,7 @@ def _document() -> StudioDocument:
         style_key="classic_word",
         content_json={"type": "doc", "content": []},
         html_content=html,
-        plain_text="Official correspondence First page body content. Second page body content.",
+        plain_text="Dear Mpho Mosotho First page body content. Second page body content.",
         settings={
             "page_size": "a4",
             "orientation": "portrait",
@@ -50,7 +58,9 @@ def _document() -> StudioDocument:
             "letterhead_code": "GRK-LEGACY",
             "letterhead_recipient": CUSTOM_RECIPIENT,
             "letterhead_company": CUSTOM_COMPANY,
-            "letterhead_address": CUSTOM_ADDRESS,
+            "letterhead_address_line_1": CUSTOM_ADDRESS_1,
+            "letterhead_address_line_2": CUSTOM_ADDRESS_2,
+            "letterhead_address_line_3": CUSTOM_ADDRESS_3,
             "letterhead_subject": CUSTOM_SUBJECT,
             "letterhead_tagline": CUSTOM_TAGLINE,
             "letterhead_phone_1": "22322537",
@@ -58,6 +68,12 @@ def _document() -> StudioDocument:
             "letterhead_email": "custom@guardrisk.co.ls",
             "letterhead_footer_left": "Guardrisk Health",
             "letterhead_footer_right": "Low Cost Medical Aid",
+            "letterhead_closing_line_1": CUSTOM_CLOSING_1,
+            "letterhead_closing_line_2": CUSTOM_CLOSING_2,
+            "letterhead_signer_name": CUSTOM_SIGNER,
+            "letterhead_signer_title": CUSTOM_TITLE,
+            "letterhead_signature_label": CUSTOM_SIGNATURE,
+            "letterhead_stamp_label": CUSTOM_STAMP,
         },
         version=4,
     )
@@ -69,36 +85,48 @@ def _container_text(container) -> str:
     return "\n".join([*paragraphs, *tables])
 
 
+def _document_body_text(word: WordDocument) -> str:
+    paragraphs = [paragraph.text for paragraph in word.paragraphs]
+    tables = [cell.text for table in word.tables for row in table.rows for cell in row.cells]
+    return "\n".join([*paragraphs, *tables])
+
+
 def test_phone_normalization_always_adds_lesotho_country_code() -> None:
     assert normalize_lesotho_phone("22322537") == "+266 2232 2537"
     assert normalize_lesotho_phone("062720488") == "+266 6272 0488"
     assert normalize_lesotho_phone("+266 5939 5332") == "+266 5939 5332"
 
 
-def test_official_settings_remove_legacy_code_and_keep_editable_details() -> None:
+def test_official_settings_match_reference_and_remove_legacy_code() -> None:
     document = _document()
     settings = official_settings(document.settings, document)
     assert settings["brand_header"] is True
-    assert settings["official_letterhead"] == "guardrisk_editable_v5_no_code"
+    assert settings["official_letterhead"] == "guardrisk_reference_v6"
     assert "letterhead_code" not in settings
     assert settings["letterhead_date_time"] == CUSTOM_DATE
     assert settings["letterhead_recipient"] == CUSTOM_RECIPIENT
     assert settings["letterhead_company"] == CUSTOM_COMPANY
     assert settings["letterhead_subject"] == CUSTOM_SUBJECT
     assert settings["letterhead_tagline"] == CUSTOM_TAGLINE
-    assert settings["letterhead_address"] == CUSTOM_ADDRESS
+    assert settings["letterhead_address_line_1"] == CUSTOM_ADDRESS_1
+    assert settings["letterhead_address_line_2"] == CUSTOM_ADDRESS_2
+    assert settings["letterhead_address_line_3"] == CUSTOM_ADDRESS_3
     assert settings["letterhead_phone_1"] == "+266 2232 2537"
     assert settings["letterhead_phone_2"] == "+266 6272 0488"
+    assert settings["letterhead_signer_name"] == CUSTOM_SIGNER
+    assert settings["letterhead_stamp_label"] == CUSTOM_STAMP
 
 
-def test_stationery_values_have_no_code_field() -> None:
-    document = _document()
-    details = stationery_values(document.settings, document)
+def test_stationery_values_have_no_code_and_keep_three_address_lines() -> None:
+    details = stationery_values(_document().settings)
     assert "code" not in details
     assert details["date_time"] == CUSTOM_DATE
+    assert details["address_line_1"] == CUSTOM_ADDRESS_1
+    assert details["address_line_2"] == CUSTOM_ADDRESS_2
+    assert details["address_line_3"] == CUSTOM_ADDRESS_3
 
 
-def test_pdf_repeats_custom_editable_stationery_without_code() -> None:
+def test_pdf_matches_reference_fields_without_code() -> None:
     payload = export_pdf(_document())
     assert payload.startswith(b"%PDF")
     reader = PdfReader(BytesIO(payload))
@@ -115,7 +143,9 @@ def test_pdf_repeats_custom_editable_stationery_without_code() -> None:
         assert CUSTOM_RECIPIENT in text
         assert CUSTOM_COMPANY in text
         assert CUSTOM_SUBJECT in text
-        assert CUSTOM_ADDRESS in text
+        assert CUSTOM_ADDRESS_1 in text
+        assert CUSTOM_ADDRESS_2 in text
+        assert CUSTOM_ADDRESS_3 in text
         assert "+266 2232 2537" in text
         assert "+266 6272 0488" in text
         assert "custom@guardrisk.co.ls" in text
@@ -125,9 +155,16 @@ def test_pdf_repeats_custom_editable_stationery_without_code() -> None:
     complete_text = "\n".join(page.extract_text() or "" for page in reader.pages)
     assert "First page body content." in complete_text
     assert "Second page body content." in complete_text
+    assert CUSTOM_CLOSING_1 in complete_text
+    assert CUSTOM_CLOSING_2 in complete_text
+    assert CUSTOM_SIGNATURE in complete_text
+    assert CUSTOM_SIGNER in complete_text
+    assert CUSTOM_TITLE in complete_text
+    assert "Digital" in complete_text
+    assert "Stamp" in complete_text
 
 
-def test_docx_uses_custom_template_fields_without_code() -> None:
+def test_docx_matches_reference_fields_without_code() -> None:
     payload = export_docx(_document())
     assert payload.startswith(b"PK")
     word = WordDocument(BytesIO(payload))
@@ -145,14 +182,22 @@ def test_docx_uses_custom_template_fields_without_code() -> None:
         assert CUSTOM_RECIPIENT in header_text
         assert CUSTOM_COMPANY in header_text
         assert CUSTOM_SUBJECT in header_text
-        assert CUSTOM_ADDRESS in header_text
-        assert CUSTOM_ADDRESS in footer_text
+        assert CUSTOM_ADDRESS_1 in header_text
+        assert CUSTOM_ADDRESS_2 in header_text
+        assert CUSTOM_ADDRESS_3 in header_text
+        assert CUSTOM_ADDRESS_1 in footer_text
         assert "+266 2232 2537" in footer_text
         assert "+266 6272 0488" in footer_text
         assert "custom@guardrisk.co.ls" in footer_text
         assert "GUARDRISK HEALTH" in footer_text
         assert "LOW COST MEDICAL AID" in footer_text
 
-    body_text = "\n".join(paragraph.text for paragraph in word.paragraphs)
+    body_text = _document_body_text(word)
     assert "First page body content." in body_text
     assert "Second page body content." in body_text
+    assert CUSTOM_CLOSING_1 in body_text
+    assert CUSTOM_CLOSING_2 in body_text
+    assert CUSTOM_SIGNATURE in body_text
+    assert CUSTOM_SIGNER in body_text
+    assert CUSTOM_TITLE in body_text
+    assert CUSTOM_STAMP in body_text
