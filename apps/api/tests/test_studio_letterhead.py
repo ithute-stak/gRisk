@@ -5,7 +5,14 @@ from docx import Document as WordDocument
 from pypdf import PdfReader
 
 from app.models.studio import StudioDocument
-from app.services.studio_letterhead import export_docx, export_pdf, official_settings
+from app.services.studio_letterhead import (
+    export_docx,
+    export_pdf,
+    normalize_lesotho_phone,
+    official_settings,
+)
+
+CUSTOM_ADDRESS = "LNDC Centre, Ground Floor, Shop No. 12"
 
 
 def _document() -> StudioDocument:
@@ -32,22 +39,39 @@ def _document() -> StudioDocument:
             "margin_bottom_mm": 12,
             "margin_left_mm": 12,
             "brand_header": False,
+            "letterhead_address": CUSTOM_ADDRESS,
+            "letterhead_phone_1": "22322537",
+            "letterhead_phone_2": "062720488",
+            "letterhead_email": "custom@guardrisk.co.ls",
+            "letterhead_footer_left": "Guardrisk Health",
+            "letterhead_footer_right": "Low Cost Medical Aid",
         },
         version=4,
     )
 
 
-def _header_footer_text(container) -> str:
-    return "\n".join(paragraph.text for paragraph in container.paragraphs)
+def _container_text(container) -> str:
+    paragraphs = [paragraph.text for paragraph in container.paragraphs]
+    tables = [cell.text for table in container.tables for row in table.rows for cell in row.cells]
+    return "\n".join([*paragraphs, *tables])
 
 
-def test_official_settings_lock_stationery_on() -> None:
+def test_phone_normalization_always_adds_lesotho_country_code() -> None:
+    assert normalize_lesotho_phone("22322537") == "+266 2232 2537"
+    assert normalize_lesotho_phone("062720488") == "+266 6272 0488"
+    assert normalize_lesotho_phone("+266 5939 5332") == "+266 5939 5332"
+
+
+def test_official_settings_lock_stationery_on_and_seed_editable_details() -> None:
     settings = official_settings({"brand_header": False})
     assert settings["brand_header"] is True
-    assert settings["official_letterhead"] == "guardrisk_minimal_v3"
+    assert settings["official_letterhead"] == "guardrisk_sketch_v3"
+    assert settings["letterhead_address"].startswith("LNDC Centre, Ground Floor")
+    assert settings["letterhead_phone_1"].startswith("+266")
+    assert settings["letterhead_phone_2"].startswith("+266")
 
 
-def test_pdf_repeats_compact_letterhead_and_footer_on_every_page() -> None:
+def test_pdf_repeats_custom_stationery_on_every_page() -> None:
     payload = export_pdf(_document())
     assert payload.startswith(b"%PDF")
     reader = PdfReader(BytesIO(payload))
@@ -56,36 +80,39 @@ def test_pdf_repeats_compact_letterhead_and_footer_on_every_page() -> None:
     for page in reader.pages:
         text = page.extract_text() or ""
         assert "GUARDRISK" in text
-        assert "INSURANCE BROKERS" in text
-        assert "Guardrisk Insurance Brokers" in text
-        assert "LNDC Centre, Kingsway, Maseru 100" in text
-        assert "info@guardrisk.co.ls" in text
-        assert "+266 2232 2537 / 6272 0488" in text
-        assert "REFERENCE" not in text
+        assert "DOCUMENT" in text
+        assert "YOUR LINK TO PREMIER HEALTHCARE" in text
+        assert CUSTOM_ADDRESS in text
+        assert "+266 2232 2537" in text
+        assert "+266 6272 0488" in text
+        assert "custom@guardrisk.co.ls" in text
+        assert "GUARDRISK HEALTH" in text
+        assert "LOW COST MEDICAL AID" in text
 
     complete_text = "\n".join(page.extract_text() or "" for page in reader.pages)
     assert "First page body content." in complete_text
     assert "Second page body content." in complete_text
 
 
-def test_docx_uses_compact_stationery_even_when_legacy_branding_is_off() -> None:
+def test_docx_uses_custom_stationery_and_normalized_numbers() -> None:
     payload = export_docx(_document())
     assert payload.startswith(b"PK")
     word = WordDocument(BytesIO(payload))
     assert word.sections
 
     for section in word.sections:
-        header_text = _header_footer_text(section.header)
-        footer_text = _header_footer_text(section.footer)
+        header_text = _container_text(section.header)
+        footer_text = _container_text(section.footer)
         assert "GUARDRISK" in header_text
-        assert "INSURANCE BROKERS" in header_text
-        assert "DATE" not in header_text
-        assert "REFERENCE" not in header_text
-        assert "OFFICIAL CORRESPONDENCE" not in header_text
-        assert "Guardrisk Insurance Brokers" in footer_text
-        assert "LNDC Centre, Kingsway, Maseru 100" in footer_text
-        assert "info@guardrisk.co.ls" in footer_text
-        assert "+266 2232 2537 / 6272 0488" in footer_text
+        assert "D O C U M E N T" in header_text
+        assert "YOUR LINK TO PREMIER HEALTHCARE" in header_text
+        assert CUSTOM_ADDRESS in header_text
+        assert CUSTOM_ADDRESS in footer_text
+        assert "+266 2232 2537" in footer_text
+        assert "+266 6272 0488" in footer_text
+        assert "custom@guardrisk.co.ls" in footer_text
+        assert "GUARDRISK HEALTH" in footer_text
+        assert "LOW COST MEDICAL AID" in footer_text
 
     body_text = "\n".join(paragraph.text for paragraph in word.paragraphs)
     assert "First page body content." in body_text
