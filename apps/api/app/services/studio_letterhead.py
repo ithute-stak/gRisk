@@ -67,17 +67,6 @@ def _maseru_now() -> str:
     return datetime.now(ZoneInfo("Africa/Maseru")).strftime("%d %B %Y, %H:%M")
 
 
-def _document_code(document: StudioDocument | None) -> str:
-    if document is None or getattr(document, "id", None) is None:
-        return "GRK-00000"
-    tail = str(document.id).replace("-", "")[-8:]
-    try:
-        number = int(tail, 16) % 100000
-    except ValueError:
-        number = 0
-    return f"GRK-{number:05d}"
-
-
 def stationery_values(
     settings: dict[str, Any] | None,
     document: StudioDocument | None = None,
@@ -85,7 +74,6 @@ def stationery_values(
     source = settings or {}
     return {
         "date_time": str(source.get("letterhead_date_time") or _maseru_now()),
-        "code": str(source.get("letterhead_code") or _document_code(document)),
         "recipient": str(source.get("letterhead_recipient") or DEFAULT_RECIPIENT),
         "company": str(source.get("letterhead_company") or DEFAULT_COMPANY),
         "address": str(source.get("letterhead_address") or DEFAULT_ADDRESS),
@@ -104,8 +92,9 @@ def official_settings(
     document: StudioDocument | None = None,
 ) -> dict[str, Any]:
     settings = dict(value or {})
+    settings.pop("letterhead_code", None)
     settings["brand_header"] = True
-    settings["official_letterhead"] = "guardrisk_editable_v4"
+    settings["official_letterhead"] = "guardrisk_editable_v5_no_code"
     details = stationery_values(settings, document)
     for key, detail in details.items():
         settings[f"letterhead_{key}"] = detail
@@ -177,9 +166,8 @@ def _draw_pdf_stationery(
     start_y = height - 49 * mm
     left = 18 * mm
     _draw_label_value(canvas, label="Date:", value=details["date_time"], x=left, y=start_y)
-    _draw_label_value(canvas, label="Code:", value=details["code"], x=left, y=start_y - 5 * mm)
-    _draw_label_value(canvas, label="To:", value=details["recipient"], x=left, y=start_y - 10 * mm)
-    _draw_label_value(canvas, label="Company:", value=details["company"], x=left, y=start_y - 15 * mm)
+    _draw_label_value(canvas, label="To:", value=details["recipient"], x=left, y=start_y - 5 * mm)
+    _draw_label_value(canvas, label="Company:", value=details["company"], x=left, y=start_y - 10 * mm)
 
     divider_x = center
     canvas.setStrokeColor(line)
@@ -329,7 +317,6 @@ def _add_docx_header(section: Any, details: dict[str, str]) -> None:
     left_cell, right_cell = meta.rows[0].cells
     left_lines = (
         ("Date: ", details["date_time"]),
-        ("Code: ", details["code"]),
         ("To: ", details["recipient"]),
         ("Company: ", details["company"]),
     )
