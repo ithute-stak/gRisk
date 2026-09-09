@@ -41,19 +41,11 @@ function formatMaseruDateTime(date = new Date()) {
   return `${value.day} ${value.month} ${value.year}, ${value.hour}:${value.minute}`;
 }
 
-function documentCode(documentId?: string) {
-  if (!documentId) return "GRK-00000";
-  const tail = documentId.replaceAll("-", "").slice(-8);
-  const numeric = Number.parseInt(tail, 16);
-  return `GRK-${String(Number.isFinite(numeric) ? numeric % 100000 : 0).padStart(5, "0")}`;
-}
-
-function withDefaults(settings: StudioSettings = {}, record?: StudioDocument | null): StudioSettings {
+function withDefaults(settings: StudioSettings = {}): StudioSettings {
   return {
     ...defaults,
     ...settings,
     letterhead_date_time: settings.letterhead_date_time || formatMaseruDateTime(),
-    letterhead_code: settings.letterhead_code || documentCode(record?.id),
     letterhead_phone_1: normalizePhone(settings.letterhead_phone_1 || defaults.letterhead_phone_1 || ""),
     letterhead_phone_2: normalizePhone(settings.letterhead_phone_2 || defaults.letterhead_phone_2 || ""),
   };
@@ -61,7 +53,7 @@ function withDefaults(settings: StudioSettings = {}, record?: StudioDocument | n
 
 export default function StudioLetterheadCustomization({ documentId }: { documentId: string }) {
   const [record, setRecord] = useState<StudioDocument | null>(null);
-  const [draft, setDraft] = useState<StudioSettings>(() => withDefaults({}, null));
+  const [draft, setDraft] = useState<StudioSettings>(() => withDefaults());
   const [target, setTarget] = useState<Element | null>(null);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -71,7 +63,7 @@ export default function StudioLetterheadCustomization({ documentId }: { document
   useEffect(() => {
     void getStudioDocument(documentId).then((item) => {
       setRecord(item);
-      setDraft(withDefaults(item.settings || {}, item));
+      setDraft(withDefaults(item.settings || {}));
     });
   }, [documentId]);
 
@@ -93,8 +85,6 @@ export default function StudioLetterheadCustomization({ documentId }: { document
     setSaving(true);
     setError("");
     try {
-      // Ask the rich-text editor to flush any pending body edits before the
-      // settings write so its optimistic version stays in sync.
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "s", ctrlKey: true, bubbles: true }));
       await new Promise((resolve) => window.setTimeout(resolve, 1200));
       const latest = await getStudioDocument(documentId);
@@ -105,6 +95,7 @@ export default function StudioLetterheadCustomization({ documentId }: { document
         letterhead_phone_1: normalizePhone(draft.letterhead_phone_1 || ""),
         letterhead_phone_2: normalizePhone(draft.letterhead_phone_2 || ""),
       };
+      delete settings.letterhead_code;
       await saveStudioDocument(documentId, { settings, expected_version: latest.version });
       setDirty(false);
       window.location.reload();
@@ -132,7 +123,6 @@ export default function StudioLetterheadCustomization({ documentId }: { document
 
       <div className="guardrisk-letter-meta">
         <label><b>Date:</b><input disabled={!editable} value={draft.letterhead_date_time || ""} onChange={(event) => setField("letterhead_date_time", event.target.value)} /></label>
-        <label><b>Code:</b><input disabled={!editable} value={draft.letterhead_code || ""} onChange={(event) => setField("letterhead_code", event.target.value)} /></label>
         <label><b>To:</b><input disabled={!editable} value={draft.letterhead_recipient || ""} onChange={(event) => setField("letterhead_recipient", event.target.value)} /></label>
         <label><b>Company:</b><input disabled={!editable} value={draft.letterhead_company || ""} onChange={(event) => setField("letterhead_company", event.target.value)} /></label>
       </div>
@@ -172,7 +162,6 @@ export default function StudioLetterheadCustomization({ documentId }: { document
         <strong>Editable letter template</strong>
         <small>Every field below is saved with this document and used in the editor preview, PDF and Word export. Phone numbers are normalized to +266.</small>
         <label>Date & time<input value={draft.letterhead_date_time || ""} onChange={(event) => setField("letterhead_date_time", event.target.value)} /></label>
-        <label>Code<input value={draft.letterhead_code || ""} onChange={(event) => setField("letterhead_code", event.target.value)} /></label>
         <label>Recipient<input value={draft.letterhead_recipient || ""} onChange={(event) => setField("letterhead_recipient", event.target.value)} /></label>
         <label>Company<input value={draft.letterhead_company || ""} onChange={(event) => setField("letterhead_company", event.target.value)} /></label>
         <label>Address<textarea value={draft.letterhead_address || ""} onChange={(event) => setField("letterhead_address", event.target.value)} placeholder="LNDC Centre, Ground Floor, Shop No. ..." /></label>
