@@ -1,2 +1,3 @@
 [lint.per-file-ignores]
 "app/services/studio_export.py" = ["I001", "FURB167", "BLE001", "S110", "RUF034"]
+"app/services/studio_letterhead.py" = ["I001"]
