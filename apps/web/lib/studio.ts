@@ -20,6 +20,9 @@ export type StudioSettings = {
   letterhead_recipient?: string;
   letterhead_company?: string;
   letterhead_address?: string;
+  letterhead_address_line_1?: string;
+  letterhead_address_line_2?: string;
+  letterhead_address_line_3?: string;
   letterhead_subject?: string;
   letterhead_tagline?: string;
   letterhead_phone_1?: string;
@@ -27,6 +30,12 @@ export type StudioSettings = {
   letterhead_email?: string;
   letterhead_footer_left?: string;
   letterhead_footer_right?: string;
+  letterhead_closing_line_1?: string;
+  letterhead_closing_line_2?: string;
+  letterhead_signer_name?: string;
+  letterhead_signer_title?: string;
+  letterhead_signature_label?: string;
+  letterhead_stamp_label?: string;
 };
 
 export type StudioDocument = {
