@@ -12,6 +12,7 @@ from app.services.studio_letterhead import (
     official_settings,
     stationery_values,
 )
+from app.services.studio_system_stamp import build_system_stamp, render_system_stamp_png
 
 CUSTOM_DATE = "09 September 2026, 11:16"
 CUSTOM_RECIPIENT = "Mpho Mosotho"
@@ -26,7 +27,7 @@ CUSTOM_CLOSING_2 = "For and on behalf of Guardrisk."
 CUSTOM_SIGNER = "M. Mosotho"
 CUSTOM_TITLE = "Authorised Signatory"
 CUSTOM_SIGNATURE = "Click here to digitally sign"
-CUSTOM_STAMP = "Digital Stamp"
+USER_CONTROLLED_STAMP = "USER CONTROLLED STAMP"
 DOCUMENT_ID = uuid.UUID("12345678-1234-5678-1234-56781234abcd")
 
 
@@ -73,7 +74,7 @@ def _document() -> StudioDocument:
             "letterhead_signer_name": CUSTOM_SIGNER,
             "letterhead_signer_title": CUSTOM_TITLE,
             "letterhead_signature_label": CUSTOM_SIGNATURE,
-            "letterhead_stamp_label": CUSTOM_STAMP,
+            "letterhead_stamp_label": USER_CONTROLLED_STAMP,
         },
         version=4,
     )
@@ -95,12 +96,13 @@ def test_phone_normalization_always_adds_lesotho_country_code() -> None:
     assert normalize_lesotho_phone("+266 5939 5332") == "+266 5939 5332"
 
 
-def test_official_settings_match_reference_and_remove_legacy_code() -> None:
+def test_official_settings_remove_user_controlled_stamp_and_legacy_code() -> None:
     document = _document()
     settings = official_settings(document.settings, document)
     assert settings["brand_header"] is True
-    assert settings["official_letterhead"] == "guardrisk_reference_v6"
+    assert settings["official_letterhead"] == "guardrisk_reference_v7_backend_stamp"
     assert "letterhead_code" not in settings
+    assert "letterhead_stamp_label" not in settings
     assert settings["letterhead_date_time"] == CUSTOM_DATE
     assert settings["letterhead_recipient"] == CUSTOM_RECIPIENT
     assert settings["letterhead_company"] == CUSTOM_COMPANY
@@ -112,23 +114,42 @@ def test_official_settings_match_reference_and_remove_legacy_code() -> None:
     assert settings["letterhead_phone_1"] == "+266 2232 2537"
     assert settings["letterhead_phone_2"] == "+266 6272 0488"
     assert settings["letterhead_signer_name"] == CUSTOM_SIGNER
-    assert settings["letterhead_stamp_label"] == CUSTOM_STAMP
 
 
-def test_stationery_values_have_no_code_and_keep_three_address_lines() -> None:
+def test_stationery_values_have_no_code_or_stamp_and_keep_three_address_lines() -> None:
     details = stationery_values(_document().settings)
     assert "code" not in details
+    assert "stamp_label" not in details
     assert details["date_time"] == CUSTOM_DATE
     assert details["address_line_1"] == CUSTOM_ADDRESS_1
     assert details["address_line_2"] == CUSTOM_ADDRESS_2
     assert details["address_line_3"] == CUSTOM_ADDRESS_3
 
 
-def test_pdf_matches_reference_fields_without_code() -> None:
+def test_system_stamp_is_backend_derived_and_png_is_real() -> None:
+    document = _document()
+    stamp = build_system_stamp(document)
+    assert stamp.brand == "GUARDRISK"
+    assert stamp.status == "OFFICIAL"
+    assert stamp.issuer == "SYSTEM GENERATED"
+    assert stamp.reference == "GR-12345678-V4"
+    assert len(stamp.content_hash) == 10
+    assert stamp.content_hash.isalnum()
+    assert USER_CONTROLLED_STAMP not in stamp.reference
+
+    png = render_system_stamp_png(document)
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+    assert len(png) > 5_000
+
+
+def test_pdf_matches_reference_and_uses_backend_system_stamp() -> None:
     payload = export_pdf(_document())
     assert payload.startswith(b"%PDF")
     reader = PdfReader(BytesIO(payload))
     assert len(reader.pages) >= 2
+    assert reader.metadata is not None
+    assert reader.metadata.get("/Creator") == "gRisk Backend Document Service"
+    assert reader.metadata.get("/Producer") == "gRisk Backend Document Service"
 
     for page in reader.pages:
         text = page.extract_text() or ""
@@ -158,11 +179,14 @@ def test_pdf_matches_reference_fields_without_code() -> None:
     assert CUSTOM_SIGNATURE in complete_text
     assert CUSTOM_SIGNER in complete_text
     assert CUSTOM_TITLE in complete_text
-    assert "Digital" in complete_text
-    assert "Stamp" in complete_text
+    assert "OFFICIAL" in complete_text
+    assert "SYSTEM GENERATED" in complete_text
+    assert "GR-12345678-V4" in complete_text
+    assert "HASH " in complete_text
+    assert USER_CONTROLLED_STAMP not in complete_text
 
 
-def test_docx_matches_reference_fields_without_code() -> None:
+def test_docx_matches_reference_and_embeds_backend_system_stamp_image() -> None:
     payload = export_docx(_document())
     assert payload.startswith(b"PK")
     word = WordDocument(BytesIO(payload))
@@ -198,5 +222,7 @@ def test_docx_matches_reference_fields_without_code() -> None:
     assert CUSTOM_SIGNATURE in body_text
     assert CUSTOM_SIGNER in body_text
     assert CUSTOM_TITLE in body_text
-    assert "Digital" in body_text
-    assert "Stamp" in body_text
+    assert USER_CONTROLLED_STAMP not in body_text
+    assert len(word.inline_shapes) >= 1
+    assert word.core_properties.last_modified_by == "gRisk Backend Document Service"
+    assert "system stamp" in (word.core_properties.keywords or "")
