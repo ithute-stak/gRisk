@@ -15,6 +15,12 @@ export type StudioSettings = {
   default_font_family?: string;
   default_font_size_pt?: number;
   default_line_height_percent?: number;
+  letterhead_address?: string;
+  letterhead_phone_1?: string;
+  letterhead_phone_2?: string;
+  letterhead_email?: string;
+  letterhead_footer_left?: string;
+  letterhead_footer_right?: string;
 };
 
 export type StudioDocument = {
