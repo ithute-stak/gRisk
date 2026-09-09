@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from io import BytesIO
 
 from docx import Document as WordDocument
@@ -126,12 +127,15 @@ def test_stationery_values_have_no_code_or_stamp_and_keep_three_address_lines() 
     assert details["address_line_3"] == CUSTOM_ADDRESS_3
 
 
-def test_system_stamp_is_backend_derived_and_png_is_real() -> None:
+def test_system_stamp_is_backend_derived_dated_and_png_is_real() -> None:
     document = _document()
-    stamp = build_system_stamp(document)
+    fixed_issue_time = datetime(2026, 9, 9, 15, 30, tzinfo=timezone.utc)
+    stamp = build_system_stamp(document, issued_at=fixed_issue_time)
     assert stamp.brand == "GUARDRISK"
+    assert stamp.legal_name == "INSURANCE BROKERS"
     assert stamp.status == "OFFICIAL"
-    assert stamp.issuer == "SYSTEM GENERATED"
+    assert stamp.issuer == "SYSTEM VERIFIED"
+    assert stamp.issued_date == "09 SEP 2026"
     assert stamp.reference == "GR-12345678-V4"
     assert len(stamp.content_hash) == 10
     assert stamp.content_hash.isalnum()
@@ -143,7 +147,9 @@ def test_system_stamp_is_backend_derived_and_png_is_real() -> None:
 
 
 def test_pdf_matches_reference_and_uses_backend_system_stamp() -> None:
-    payload = export_pdf(_document())
+    document = _document()
+    expected_stamp = build_system_stamp(document)
+    payload = export_pdf(document)
     assert payload.startswith(b"%PDF")
     reader = PdfReader(BytesIO(payload))
     assert len(reader.pages) >= 2
@@ -179,10 +185,12 @@ def test_pdf_matches_reference_and_uses_backend_system_stamp() -> None:
     assert CUSTOM_SIGNATURE in complete_text
     assert CUSTOM_SIGNER in complete_text
     assert CUSTOM_TITLE in complete_text
+    assert "INSURANCE BROKERS" in complete_text
     assert "OFFICIAL" in complete_text
-    assert "SYSTEM GENERATED" in complete_text
+    assert "SYSTEM VERIFIED" in complete_text
+    assert f"DATE  {expected_stamp.issued_date}" in complete_text
     assert "GR-12345678-V4" in complete_text
-    assert "HASH " in complete_text
+    assert "VERIFY " in complete_text
     assert USER_CONTROLLED_STAMP not in complete_text
 
 
