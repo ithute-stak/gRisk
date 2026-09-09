@@ -132,14 +132,14 @@ def test_system_stamp_is_backend_derived_dated_and_png_is_real() -> None:
     fixed_issue_time = datetime(2026, 9, 9, 15, 30, tzinfo=timezone.utc)
     stamp = build_system_stamp(document, issued_at=fixed_issue_time)
     assert stamp.brand == "GUARDRISK"
-    assert stamp.legal_name == "INSURANCE BROKERS"
-    assert stamp.status == "OFFICIAL"
     assert stamp.issuer == "SYSTEM VERIFIED"
     assert stamp.issued_date == "09 SEP 2026"
     assert stamp.reference == "GR-12345678-V4"
     assert len(stamp.content_hash) == 10
     assert stamp.content_hash.isalnum()
     assert USER_CONTROLLED_STAMP not in stamp.reference
+    assert not hasattr(stamp, "legal_name")
+    assert not hasattr(stamp, "status")
 
     png = render_system_stamp_png(document)
     assert png.startswith(b"\x89PNG\r\n\x1a\n")
@@ -185,8 +185,8 @@ def test_pdf_matches_reference_and_uses_backend_system_stamp() -> None:
     assert CUSTOM_SIGNATURE in complete_text
     assert CUSTOM_SIGNER in complete_text
     assert CUSTOM_TITLE in complete_text
-    assert "INSURANCE BROKERS" in complete_text
-    assert "OFFICIAL" in complete_text
+    assert "INSURANCE BROKERS" not in complete_text
+    assert "OFFICIAL" not in complete_text
     assert "SYSTEM VERIFIED" in complete_text
     assert f"DATE  {expected_stamp.issued_date}" in complete_text
     assert "GR-12345678-V4" in complete_text

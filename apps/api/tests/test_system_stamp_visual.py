@@ -31,11 +31,11 @@ def test_stamp_uses_backend_export_date_and_traceable_reference() -> None:
     # 22:30 UTC is already 10 September in Maseru (UTC+02:00).
     assert stamp.issued_date == "10 SEP 2026"
     assert stamp.brand == "GUARDRISK"
-    assert stamp.legal_name == "INSURANCE BROKERS"
-    assert stamp.status == "OFFICIAL"
     assert stamp.issuer == "SYSTEM VERIFIED"
     assert stamp.reference == "GR-AAAAAAAA-V7"
     assert len(stamp.content_hash) == 10
+    assert not hasattr(stamp, "legal_name")
+    assert not hasattr(stamp, "status")
 
 
 def test_stamp_png_is_high_resolution_square_artwork() -> None:
