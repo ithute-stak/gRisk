@@ -80,7 +80,7 @@ def test_pdf_repeats_custom_stationery_on_every_page() -> None:
     for page in reader.pages:
         text = page.extract_text() or ""
         assert "GUARDRISK" in text
-        assert "DOCUMENT" in text
+        assert "D O C U M E N T" in text
         assert "YOUR LINK TO PREMIER HEALTHCARE" in text
         assert CUSTOM_ADDRESS in text
         assert "+266 2232 2537" in text
