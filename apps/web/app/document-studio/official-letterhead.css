@@ -1,48 +1,44 @@
 .loanhub-studio-engine .document-paper{
-  padding-top:60mm!important;
-  padding-bottom:38mm!important;
+  padding-top:96mm!important;
+  padding-bottom:40mm!important;
   background-color:#fff!important;
   background-image:none!important;
   -webkit-print-color-adjust:exact;
   print-color-adjust:exact;
 }
 
-.loanhub-studio-engine .document-paper::before,
+.loanhub-studio-engine .document-paper::before{
+  content:"";
+  position:absolute;
+  inset:0 0 auto;
+  height:1px;
+  z-index:0;
+  pointer-events:none;
+}
+
 .loanhub-studio-engine .document-paper::after{
   content:"";
   position:absolute;
   left:0;
   right:0;
+  bottom:0;
+  height:34mm;
   z-index:0;
   pointer-events:none;
+  background-image:url("/brand/guardrisk-premium-footer-v2.svg");
   background-repeat:no-repeat;
-  background-position:center;
+  background-position:center bottom;
+  background-size:100% 100%;
   -webkit-print-color-adjust:exact;
   print-color-adjust:exact;
 }
 
-.loanhub-studio-engine .document-paper::before{
-  top:0;
-  height:54mm;
-  background-image:url("/brand/guardrisk-premium-letterhead-v2.svg");
-  background-size:100% 100%;
-}
-
-.loanhub-studio-engine .document-paper::after{
-  bottom:0;
-  height:34mm;
-  background-image:url("/brand/guardrisk-premium-footer-v2.svg");
-  background-size:100% 100%;
-}
-
-.loanhub-studio-engine .document-paper>.office-paper-brand{
-  display:none!important;
-}
+.loanhub-studio-engine .document-paper>.office-paper-brand{display:none!important;}
 
 .loanhub-studio-engine .document-editor-content{
   position:relative;
   z-index:1;
-  min-height:calc(297mm - 98mm);
+  min-height:calc(297mm - 136mm);
 }
 
 .guardrisk-stationery-overlay{
@@ -52,72 +48,216 @@
   pointer-events:none;
   color:#344054;
   font-family:Arial,Helvetica,sans-serif;
-  line-height:1.25;
+  line-height:1.2;
 }
+
+.guardrisk-stationery-overlay input,
+.guardrisk-stationery-overlay textarea{
+  pointer-events:auto;
+  margin:0;
+  border:0;
+  outline:0;
+  border-radius:3px;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  line-height:inherit;
+  padding:.35mm .6mm;
+  min-width:0;
+}
+
+.guardrisk-stationery-overlay input:not(:disabled):hover,
+.guardrisk-stationery-overlay textarea:not(:disabled):hover{background:rgb(241 90 36 / 6%);}
+.guardrisk-stationery-overlay input:not(:disabled):focus,
+.guardrisk-stationery-overlay textarea:not(:disabled):focus{
+  background:#fff8f4;
+  box-shadow:0 0 0 1px #f15a24;
+}
+
+.guardrisk-brand-lockup{
+  position:absolute;
+  top:5mm;
+  left:50%;
+  transform:translateX(-50%);
+  width:90mm;
+  display:grid;
+  justify-items:center;
+  color:#f15a24;
+  pointer-events:none;
+}
+
+.guardrisk-brand-g{
+  width:16mm;
+  height:16mm;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:#f15a24;
+  color:#fff;
+  font:700 27pt/1 Georgia,"Times New Roman",serif;
+}
+
+.guardrisk-brand-name{
+  margin-top:2mm;
+  color:#f15a24;
+  font:700 21pt/1 Georgia,"Times New Roman",serif;
+  letter-spacing:.2px;
+}
+
+.guardrisk-tagline-input{
+  position:absolute;
+  top:31mm;
+  left:50%;
+  transform:translateX(-50%);
+  width:110mm;
+  text-align:center;
+  text-transform:uppercase;
+  letter-spacing:2.2px;
+  color:#344054!important;
+  font-size:7pt!important;
+  border-left:40mm solid transparent!important;
+  border-right:40mm solid transparent!important;
+}
+
+.guardrisk-tagline-input::before{content:"";}
+
+.guardrisk-stationery-overlay::before,
+.guardrisk-stationery-overlay::after{
+  content:"";
+  position:absolute;
+  top:34.2mm;
+  width:38mm;
+  height:.45px;
+  background:#f15a24;
+}
+.guardrisk-stationery-overlay::before{left:18mm;}
+.guardrisk-stationery-overlay::after{right:18mm;}
+
+.guardrisk-letter-meta{
+  position:absolute;
+  top:44mm;
+  left:18mm;
+  width:77mm;
+  display:grid;
+  gap:.8mm;
+  font-size:7.4pt;
+}
+
+.guardrisk-letter-meta label{
+  display:grid;
+  grid-template-columns:19mm 1fr;
+  align-items:center;
+}
+.guardrisk-letter-meta b{font-weight:700;color:#263447;}
+.guardrisk-letter-meta input{width:100%;}
 
 .guardrisk-letterhead-address{
   position:absolute;
-  top:37mm;
+  top:44mm;
   right:18mm;
-  width:54mm;
+  width:76mm;
+  min-height:23mm;
   display:grid;
-  grid-template-columns:auto 1fr;
+  grid-template-columns:21mm 1fr;
   gap:2mm;
-  font-size:7.5pt;
-  text-align:left;
+  align-items:start;
+  padding-left:6mm;
+  border-left:.45px solid #98a2b3;
+  font-size:7.4pt;
+  pointer-events:none;
+}
+.guardrisk-letterhead-address strong{padding-top:.5mm;font-weight:700;color:#263447;}
+.guardrisk-letterhead-address textarea{
+  pointer-events:auto;
+  width:100%;
+  min-height:18mm;
+  resize:none;
+  white-space:pre-wrap;
+  overflow:hidden;
 }
 
-.guardrisk-letterhead-address strong{font-weight:700;color:#263447;}
-.guardrisk-letterhead-address span{white-space:pre-line;}
+.guardrisk-subject-line{
+  position:absolute;
+  top:73mm;
+  left:18mm;
+  right:18mm;
+  display:grid;
+  grid-template-columns:11mm 1fr;
+  align-items:center;
+  gap:1mm;
+  padding-bottom:2mm;
+  border-bottom:.7px solid #f15a24;
+  color:#f15a24;
+  font-size:12pt;
+  font-weight:700;
+  pointer-events:none;
+}
+.guardrisk-subject-line input{
+  pointer-events:auto;
+  width:100%;
+  color:#f15a24;
+  font-weight:700;
+}
 
 .guardrisk-letterhead-footer-contact{
   position:absolute;
   left:18mm;
   right:18mm;
-  bottom:19mm;
+  bottom:18.5mm;
   display:grid;
-  grid-template-columns:1.25fr 1fr 1fr;
+  grid-template-columns:1.25fr 1fr .95fr;
   gap:5mm;
   align-items:center;
   font-size:6.5pt;
   color:#5b6573;
 }
 
-.guardrisk-letterhead-footer-contact span{
-  display:flex;
+.guardrisk-letterhead-footer-contact label{
+  display:grid;
+  grid-template-columns:7mm 1fr;
   align-items:center;
   gap:2mm;
   min-width:0;
+  pointer-events:none;
 }
 
 .guardrisk-letterhead-footer-contact b{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  width:6mm;
-  height:6mm;
-  flex:0 0 6mm;
+  display:grid;
+  place-items:center;
+  width:7mm;
+  height:7mm;
   border-radius:50%;
   background:#f15a24;
   color:#fff;
-  font-size:7pt;
+  font-size:8pt;
 }
+.guardrisk-letterhead-footer-contact input,
+.guardrisk-letterhead-footer-contact textarea{pointer-events:auto;width:100%;}
+.guardrisk-letterhead-footer-contact textarea{height:13mm;resize:none;overflow:hidden;}
+.guardrisk-letterhead-footer-contact span{display:grid;gap:.6mm;}
 
 .guardrisk-letterhead-footer-labels{
   position:absolute;
-  left:18mm;
-  right:18mm;
-  bottom:12.5mm;
+  left:10mm;
+  right:10mm;
+  bottom:5mm;
   display:flex;
   justify-content:space-between;
+  align-items:center;
   gap:8mm;
-  padding-top:1.5mm;
-  border-top:.35px solid #98a2b3;
-  font-size:6pt;
-  letter-spacing:1.5px;
-  color:#566377;
-  text-transform:uppercase;
+  z-index:3;
+  pointer-events:none;
 }
+.guardrisk-letterhead-footer-labels input{
+  pointer-events:auto;
+  width:75mm;
+  color:#fff;
+  text-transform:uppercase;
+  letter-spacing:2px;
+  font-size:6.3pt;
+  font-weight:700;
+}
+.guardrisk-letterhead-footer-labels input:last-child{text-align:right;}
 
 .studio-letterhead-customizer{
   position:fixed;
@@ -125,10 +265,11 @@
   top:118px;
   z-index:80;
 }
+.studio-letterhead-customizer-actions{display:flex;gap:8px;justify-content:flex-end;}
 
 .studio-letterhead-customizer-panel{
   margin-top:8px;
-  width:min(360px,calc(100vw - 36px));
+  width:min(380px,calc(100vw - 36px));
   max-height:calc(100vh - 175px);
   overflow:auto;
   padding:14px;
@@ -167,10 +308,14 @@
 @media print{
   .studio-letterhead-customizer{display:none!important;}
   .loanhub-studio-engine .document-paper{
-    padding-top:60mm!important;
-    padding-bottom:38mm!important;
+    padding-top:96mm!important;
+    padding-bottom:40mm!important;
     box-shadow:none!important;
   }
-  .loanhub-studio-engine .document-paper::before{position:fixed;top:0;left:0;right:0;}
+  .guardrisk-stationery-overlay input,
+  .guardrisk-stationery-overlay textarea{
+    box-shadow:none!important;
+    background:transparent!important;
+  }
   .loanhub-studio-engine .document-paper::after{position:fixed;bottom:0;left:0;right:0;}
 }
