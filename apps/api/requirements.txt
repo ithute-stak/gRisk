@@ -16,3 +16,4 @@ bleach==6.4.0
 tinycss2==1.5.1
 beautifulsoup4==4.13.4
 python-docx==1.2.0
+Pillow==12.3.0
