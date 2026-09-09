@@ -7,7 +7,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from docx import Document as WordDocument
-from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -95,7 +95,7 @@ def stationery_values(
     del document
     source = settings or {}
     address_line_1, address_line_2, address_line_3 = _legacy_address_lines(source)
-    address = "\n".join((address_line_1, address_line_2, address_line_3))
+    address = f"{address_line_1}\n{address_line_2}\n{address_line_3}"
     return {
         "date_time": str(source.get("letterhead_date_time") or _maseru_now()),
         "recipient": str(source.get("letterhead_recipient") or DEFAULT_RECIPIENT),
@@ -393,7 +393,15 @@ def _set_run(run: Any, *, size: float, bold: bool = False, color: str = NAVY) ->
     run.font.color.rgb = RGBColor.from_string(color.lstrip("#"))
 
 
-def _cell_border(cell: Any, *, top: str | None = None, bottom: str | None = None, left: str | None = None, right: str | None = None, size: str = "6") -> None:
+def _cell_border(
+    cell: Any,
+    *,
+    top: str | None = None,
+    bottom: str | None = None,
+    left: str | None = None,
+    right: str | None = None,
+    size: str = "6",
+) -> None:
     tc_pr = cell._tc.get_or_add_tcPr()
     borders = tc_pr.first_child_found_in("w:tcBorders")
     if borders is None:
@@ -499,9 +507,10 @@ def _add_docx_footer(section: Any, details: dict[str, str]) -> None:
             _cell_border(cell, left=LINE, size="4")
         paragraph = cell.paragraphs[0]
         paragraph.paragraph_format.space_after = Pt(0)
-        for line_index, line_value in enumerate(value.split("\n")):
+        lines = value.split("\n")
+        for line_index, line_value in enumerate(lines):
             _set_run(paragraph.add_run(line_value), size=5.7, color=MUTED)
-            if line_index < len(value.split("\n")) - 1:
+            if line_index < len(lines) - 1:
                 paragraph.add_run().add_break()
 
     labels = footer.add_paragraph()
@@ -553,9 +562,10 @@ def _add_docx_signature(word: WordDocument, details: dict[str, str]) -> None:
     stamp.paragraph_format.space_before = Pt(16)
     stamp.paragraph_format.space_after = Pt(16)
     _cell_border(right, top=ORANGE, bottom=ORANGE, left=ORANGE, right=ORANGE, size="8")
-    for index, word_part in enumerate(details["stamp_label"].split()):
+    stamp_words = details["stamp_label"].split()
+    for index, word_part in enumerate(stamp_words):
         _set_run(stamp.add_run(word_part), size=8.3, color=MUTED)
-        if index < len(details["stamp_label"].split()) - 1:
+        if index < len(stamp_words) - 1:
             stamp.add_run().add_break()
 
 
