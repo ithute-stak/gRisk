@@ -20,6 +20,7 @@ from reportlab.pdfgen import canvas as pdf_canvas
 from app.models.studio import StudioDocument
 from app.services.studio_export import export_docx as export_base_docx
 from app.services.studio_export import export_pdf as export_base_pdf
+from app.services.studio_system_stamp import draw_pdf_system_stamp, render_system_stamp_png
 
 ORANGE = "#F23808"
 PEACH = "#F7B38C"
@@ -45,7 +46,6 @@ DEFAULT_CLOSING_2 = "For and on behalf of Guardrisk."
 DEFAULT_SIGNER_NAME = "Your Name"
 DEFAULT_SIGNER_TITLE = "Your Title"
 DEFAULT_SIGNATURE_LABEL = "Click here to digitally sign"
-DEFAULT_STAMP_LABEL = "Digital Stamp"
 
 
 def _number(value: Any, default: float) -> float:
@@ -116,7 +116,6 @@ def stationery_values(
         "signer_name": str(source.get("letterhead_signer_name") or DEFAULT_SIGNER_NAME),
         "signer_title": str(source.get("letterhead_signer_title") or DEFAULT_SIGNER_TITLE),
         "signature_label": str(source.get("letterhead_signature_label") or DEFAULT_SIGNATURE_LABEL),
-        "stamp_label": str(source.get("letterhead_stamp_label") or DEFAULT_STAMP_LABEL),
     }
 
 
@@ -126,8 +125,9 @@ def official_settings(
 ) -> dict[str, Any]:
     settings = dict(value or {})
     settings.pop("letterhead_code", None)
+    settings.pop("letterhead_stamp_label", None)
     settings["brand_header"] = True
-    settings["official_letterhead"] = "guardrisk_reference_v6"
+    settings["official_letterhead"] = "guardrisk_reference_v7_backend_stamp"
     details = stationery_values(settings, document)
     for key, detail in details.items():
         settings[f"letterhead_{key}"] = detail
@@ -309,6 +309,7 @@ def _draw_pdf_signature(
     canvas: pdf_canvas.Canvas,
     width: float,
     details: dict[str, str],
+    document: StudioDocument,
 ) -> None:
     orange = colors.HexColor(ORANGE)
     navy = colors.HexColor(NAVY)
@@ -346,19 +347,13 @@ def _draw_pdf_signature(
     canvas.setFont("Helvetica", 7.3)
     canvas.drawString(10 * mm, 59.5 * mm, details["signer_title"])
 
-    stamp_x = width - 33 * mm
-    stamp_y = 78 * mm
-    canvas.setStrokeColor(orange)
-    canvas.setLineWidth(0.8)
-    canvas.circle(stamp_x, stamp_y, 18 * mm, stroke=1, fill=0)
-    canvas.setFillColor(colors.HexColor(MUTED))
-    canvas.setFont("Helvetica", 8.2)
-    words = details["stamp_label"].split()
-    if len(words) > 1:
-        canvas.drawCentredString(stamp_x, stamp_y + 2 * mm, words[0])
-        canvas.drawCentredString(stamp_x, stamp_y - 3 * mm, " ".join(words[1:]))
-    else:
-        canvas.drawCentredString(stamp_x, stamp_y, details["stamp_label"])
+    draw_pdf_system_stamp(
+        canvas,
+        document,
+        center_x=width - 33 * mm,
+        center_y=78 * mm,
+        diameter=38 * mm,
+    )
 
 
 def export_pdf(document: StudioDocument) -> bytes:
@@ -374,13 +369,17 @@ def export_pdf(document: StudioDocument) -> bytes:
         overlay_canvas = pdf_canvas.Canvas(overlay_buffer, pagesize=(width, height))
         _draw_pdf_header_footer(overlay_canvas, width, height, details)
         if index == page_count - 1:
-            _draw_pdf_signature(overlay_canvas, width, details)
+            _draw_pdf_signature(overlay_canvas, width, details, document)
         overlay_canvas.save()
         overlay_buffer.seek(0)
         page.merge_page(PdfReader(overlay_buffer).pages[0], over=True)
         writer.add_page(page)
-    if reader.metadata:
-        writer.add_metadata({key: str(value) for key, value in reader.metadata.items() if value is not None})
+
+    metadata = {key: str(value) for key, value in (reader.metadata or {}).items() if value is not None}
+    metadata["/Creator"] = "gRisk Backend Document Service"
+    metadata["/Producer"] = "gRisk Backend Document Service"
+    metadata["/Author"] = "Guardrisk Insurance Brokers"
+    writer.add_metadata(metadata)
     output = BytesIO()
     writer.write(output)
     return output.getvalue()
@@ -521,7 +520,7 @@ def _add_docx_footer(section: Any, details: dict[str, str]) -> None:
     _set_run(labels.add_run(details["footer_right"].upper()), size=5.7, bold=True, color=ORANGE)
 
 
-def _add_docx_signature(word: WordDocument, details: dict[str, str]) -> None:
+def _add_docx_signature(word: WordDocument, details: dict[str, str], document: StudioDocument) -> None:
     closing = word.add_paragraph()
     closing.paragraph_format.space_before = Pt(26)
     closing.paragraph_format.space_after = Pt(5)
@@ -535,6 +534,7 @@ def _add_docx_signature(word: WordDocument, details: dict[str, str]) -> None:
     left, right = outer.rows[0].cells
     left.width = Mm(115)
     right.width = Mm(48)
+    right.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
 
     signature = left.add_table(rows=1, cols=2)
     signature.autofit = False
@@ -559,14 +559,9 @@ def _add_docx_signature(word: WordDocument, details: dict[str, str]) -> None:
 
     stamp = right.paragraphs[0]
     stamp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    stamp.paragraph_format.space_before = Pt(16)
-    stamp.paragraph_format.space_after = Pt(16)
-    _cell_border(right, top=ORANGE, bottom=ORANGE, left=ORANGE, right=ORANGE, size="8")
-    stamp_words = details["stamp_label"].split()
-    for index, word_part in enumerate(stamp_words):
-        _set_run(stamp.add_run(word_part), size=8.3, color=MUTED)
-        if index < len(stamp_words) - 1:
-            stamp.add_run().add_break()
+    stamp.paragraph_format.space_before = Pt(0)
+    stamp.paragraph_format.space_after = Pt(0)
+    stamp.add_run().add_picture(BytesIO(render_system_stamp_png(document)), width=Mm(40))
 
 
 def export_docx(document: StudioDocument) -> bytes:
@@ -583,11 +578,13 @@ def export_docx(document: StudioDocument) -> bytes:
         _add_docx_header(section, details)
         _add_docx_footer(section, details)
 
-    _add_docx_signature(word, details)
+    _add_docx_signature(word, details, document)
     core = word.core_properties
     core.author = "Guardrisk Insurance Brokers"
+    core.last_modified_by = "gRisk Backend Document Service"
     core.subject = "Official Guardrisk correspondence"
-    core.comments = "Generated by gRisk Document Studio using the approved Guardrisk stationery"
+    core.keywords = "gRisk backend generated; system stamp; Guardrisk"
+    core.comments = "Generated by the gRisk backend using the approved Guardrisk stationery and system-managed stamp"
     output = BytesIO()
     word.save(output)
     return output.getvalue()
