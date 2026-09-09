@@ -1,32 +1,33 @@
 import re
 import uuid
-from html import unescape
 from io import BytesIO
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, LETTER, landscape
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import mm
-from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer
 from sqlalchemy import and_, delete, or_, select
 
 from app.api.deps import CurrentUser, DbSession
 from app.models.identity import User
 from app.models.studio import StudioCollaborator, StudioDocument, StudioRevision
 from app.services.audit import record_audit_event
+from app.services.studio_export import plain_text_from_html, sanitize_document_html
+from app.services.studio_letterhead import export_docx, export_pdf
 
 router = APIRouter(prefix="/document-studio/documents", tags=["document-studio"])
+
+
+def _empty_document() -> dict:
+    return {"type": "doc", "content": []}
 
 
 class StudioCreate(BaseModel):
     title: str = Field(default="Untitled document", min_length=1, max_length=240)
     template_key: str = Field(default="blank", max_length=80)
     style_key: str = Field(default="guardrisk_orange", max_length=80)
-    html_content: str = Field(default="<p></p>", max_length=500_000)
-    plain_text: str = Field(default="", max_length=250_000)
+    content_json: dict = Field(default_factory=_empty_document)
+    html_content: str = Field(default="<p></p>", max_length=2_500_000)
+    plain_text: str = Field(default="", max_length=1_000_000)
     settings: dict = Field(default_factory=dict)
     visibility: str = Field(default="private", pattern="^(private|team)$")
 
@@ -34,8 +35,9 @@ class StudioCreate(BaseModel):
 class StudioUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=240)
     style_key: str | None = Field(default=None, max_length=80)
-    html_content: str | None = Field(default=None, max_length=500_000)
-    plain_text: str | None = Field(default=None, max_length=250_000)
+    content_json: dict | None = None
+    html_content: str | None = Field(default=None, max_length=2_500_000)
+    plain_text: str | None = Field(default=None, max_length=1_000_000)
     settings: dict | None = None
     visibility: str | None = Field(default=None, pattern="^(private|team)$")
     status: str | None = Field(default=None, pattern="^(draft|review|final|archived)$")
@@ -56,6 +58,7 @@ def _serialize(document: StudioDocument, *, can_edit: bool = True) -> dict:
         "style_key": document.style_key,
         "status": document.status,
         "visibility": document.visibility,
+        "content_json": document.content_json or _empty_document(),
         "html_content": document.html_content,
         "plain_text": document.plain_text,
         "settings": document.settings,
@@ -89,10 +92,7 @@ async def _access(
     if collaboration:
         can_edit = collaboration.permission == "edit"
         if write and not can_edit:
-            raise HTTPException(
-                status_code=403,
-                detail="This document was shared with view-only access",
-            )
+            raise HTTPException(status_code=403, detail="This document was shared with view-only access")
         return document, can_edit
     if document.visibility == "team" and not write:
         return document, False
@@ -106,9 +106,7 @@ async def list_documents(
     q: str = "",
     document_status: str = "",
 ) -> list[dict]:
-    collaborator_ids = select(StudioCollaborator.document_id).where(
-        StudioCollaborator.user_id == user.id
-    )
+    collaborator_ids = select(StudioCollaborator.document_id).where(StudioCollaborator.user_id == user.id)
     access_filter = or_(
         StudioDocument.owner_user_id == user.id,
         StudioDocument.visibility == "team",
@@ -117,9 +115,7 @@ async def list_documents(
     conditions = [access_filter]
     if q.strip():
         token = f"%{q.strip()}%"
-        conditions.append(
-            or_(StudioDocument.title.ilike(token), StudioDocument.plain_text.ilike(token))
-        )
+        conditions.append(or_(StudioDocument.title.ilike(token), StudioDocument.plain_text.ilike(token)))
     if document_status.strip():
         conditions.append(StudioDocument.status == document_status.strip())
     rows = (
@@ -154,13 +150,15 @@ async def create_document(
     session: DbSession,
     user: CurrentUser,
 ) -> dict:
+    clean_html = sanitize_document_html(payload.html_content)
     document = StudioDocument(
         owner_user_id=user.id,
         title=payload.title.strip(),
         template_key=payload.template_key,
         style_key=payload.style_key,
-        html_content=payload.html_content,
-        plain_text=payload.plain_text,
+        content_json=payload.content_json or _empty_document(),
+        html_content=clean_html,
+        plain_text=plain_text_from_html(clean_html),
         settings=payload.settings,
         visibility=payload.visibility,
     )
@@ -200,24 +198,27 @@ async def update_document(
 ) -> dict:
     document, _ = await _access(session, user, document_id, write=True)
     if payload.expected_version is not None and payload.expected_version != document.version:
-        raise HTTPException(
-            status_code=409,
-            detail="This document changed elsewhere. Reload before saving again.",
-        )
-    for field in (
-        "title",
-        "style_key",
-        "html_content",
-        "plain_text",
-        "settings",
-        "visibility",
-        "status",
-    ):
-        value = getattr(payload, field)
-        if value is not None:
-            if field == "title":
-                value = value.strip()
-            setattr(document, field, value)
+        raise HTTPException(status_code=409, detail="This document changed elsewhere. Reload before saving again.")
+
+    if payload.title is not None:
+        document.title = payload.title.strip()
+    if payload.style_key is not None:
+        document.style_key = payload.style_key
+    if payload.content_json is not None:
+        document.content_json = payload.content_json
+    if payload.html_content is not None:
+        clean_html = sanitize_document_html(payload.html_content)
+        document.html_content = clean_html
+        document.plain_text = plain_text_from_html(clean_html)
+    elif payload.plain_text is not None:
+        document.plain_text = payload.plain_text
+    if payload.settings is not None:
+        document.settings = payload.settings
+    if payload.visibility is not None:
+        document.visibility = payload.visibility
+    if payload.status is not None:
+        document.status = payload.status
+
     document.version += 1
     await record_audit_event(
         session,
@@ -268,6 +269,7 @@ async def checkpoint(
         document_id=document.id,
         version=document.version,
         title=document.title,
+        content_json=document.content_json or _empty_document(),
         html_content=document.html_content,
         plain_text=document.plain_text,
         settings=document.settings,
@@ -289,12 +291,7 @@ async def checkpoint(
         if existing is None:
             raise
         revision = existing
-    return {
-        "id": str(revision.id),
-        "version": revision.version,
-        "title": revision.title,
-        "created_at": revision.created_at,
-    }
+    return {"id": str(revision.id), "version": revision.version, "title": revision.title, "created_at": revision.created_at}
 
 
 @router.get("/{document_id}/revisions")
@@ -316,6 +313,7 @@ async def revisions(
             "id": str(row.id),
             "version": row.version,
             "title": row.title,
+            "content_json": row.content_json or _empty_document(),
             "html_content": row.html_content,
             "plain_text": row.plain_text,
             "settings": row.settings,
@@ -343,12 +341,7 @@ async def collaborators(
         )
     ).all()
     return [
-        {
-            "user_id": str(collab.user_id),
-            "name": target.full_name,
-            "email": target.email,
-            "permission": collab.permission,
-        }
+        {"user_id": str(collab.user_id), "name": target.full_name, "email": target.email, "permission": collab.permission}
         for collab, target in rows
     ]
 
@@ -380,19 +373,10 @@ async def add_collaborator(
         existing.permission = payload.permission
         collaboration = existing
     else:
-        collaboration = StudioCollaborator(
-            document_id=document_id,
-            user_id=payload.user_id,
-            permission=payload.permission,
-        )
+        collaboration = StudioCollaborator(document_id=document_id, user_id=payload.user_id, permission=payload.permission)
         session.add(collaboration)
     await session.commit()
-    return {
-        "user_id": str(target.id),
-        "name": target.full_name,
-        "email": target.email,
-        "permission": collaboration.permission,
-    }
+    return {"user_id": str(target.id), "name": target.full_name, "email": target.email, "permission": collaboration.permission}
 
 
 @router.delete("/{document_id}/collaborators/{target_user_id}", status_code=204)
@@ -415,108 +399,43 @@ async def remove_collaborator(
     return Response(status_code=204)
 
 
-def _clean_html_for_reportlab(html: str) -> list[str]:
-    text = html
-    text = re.sub(r"<\s*br\s*/?>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(
-        r"</\s*(p|div|h[1-6]|li|tr)\s*>",
-        "\n",
-        text,
-        flags=re.IGNORECASE,
-    )
-    text = re.sub(r"<\s*li[^>]*>", "• ", text, flags=re.IGNORECASE)
-    text = re.sub(r"<[^>]+>", "", text)
-    text = unescape(text).replace("\xa0", " ")
-    return [line.strip() for line in text.splitlines() if line.strip()]
-
-
-def _pdf_for(document: StudioDocument) -> BytesIO:
-    settings = document.settings or {}
-    page_size = LETTER if settings.get("page_size") == "letter" else A4
-    if settings.get("orientation") == "landscape":
-        page_size = landscape(page_size)
-    margin_mm = max(10, min(40, int(settings.get("margin_mm", 20) or 20)))
-    buffer = BytesIO()
-    pdf = SimpleDocTemplate(
-        buffer,
-        pagesize=page_size,
-        rightMargin=margin_mm * mm,
-        leftMargin=margin_mm * mm,
-        topMargin=margin_mm * mm,
-        bottomMargin=margin_mm * mm,
-        title=document.title,
-        author="gRisk Document Studio",
-    )
-    styles = getSampleStyleSheet()
-    body = ParagraphStyle(
-        "gRiskBody",
-        parent=styles["BodyText"],
-        fontName="Helvetica",
-        fontSize=10.5,
-        leading=15,
-        textColor=colors.HexColor("#25272B"),
-        spaceAfter=7,
-    )
-    story = []
-    if settings.get("brand_header", True):
-        story.extend(
-            [
-                Paragraph(
-                    '<font color="#F47A20"><b>G</b></font>  <b>GUARDRISK</b>',
-                    styles["Title"],
-                ),
-                Paragraph(
-                    "Insurance · Medical Aid · Bonds & Guarantees · Risk Management",
-                    styles["Normal"],
-                ),
-                Spacer(1, 5 * mm),
-            ]
-        )
-    for line in _clean_html_for_reportlab(document.html_content):
-        if line == "[[PAGE_BREAK]]":
-            story.append(PageBreak())
-        else:
-            story.append(Paragraph(line.replace("&", "&amp;"), body))
-    pdf.build(story)
-    buffer.seek(0)
-    return buffer
+def _safe_filename(document: StudioDocument) -> str:
+    return re.sub(r"[^A-Za-z0-9_-]+", "_", document.title).strip("_") or "guardrisk-document"
 
 
 @router.get("/{document_id}/export/pdf")
-async def export_pdf(
+async def export_document_pdf(
     document_id: uuid.UUID,
     session: DbSession,
     user: CurrentUser,
 ) -> StreamingResponse:
     document, _ = await _access(session, user, document_id)
-    safe = (
-        re.sub(r"[^A-Za-z0-9_-]+", "_", document.title).strip("_")
-        or "guardrisk-document"
-    )
     return StreamingResponse(
-        _pdf_for(document),
+        BytesIO(export_pdf(document)),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{safe}.pdf"'},
+        headers={"Content-Disposition": f'attachment; filename="{_safe_filename(document)}.pdf"'},
+    )
+
+
+@router.get("/{document_id}/export/docx")
+async def export_document_docx(
+    document_id: uuid.UUID,
+    session: DbSession,
+    user: CurrentUser,
+) -> StreamingResponse:
+    document, _ = await _access(session, user, document_id)
+    return StreamingResponse(
+        BytesIO(export_docx(document)),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{_safe_filename(document)}.docx"'},
     )
 
 
 @router.get("/{document_id}/export/word")
-async def export_word(
+async def export_document_word_compatibility(
     document_id: uuid.UUID,
     session: DbSession,
     user: CurrentUser,
-) -> Response:
-    document, _ = await _access(session, user, document_id)
-    safe = (
-        re.sub(r"[^A-Za-z0-9_-]+", "_", document.title).strip("_")
-        or "guardrisk-document"
-    )
-    html = (
-        '<!doctype html><html><head><meta charset="utf-8"><title>'
-        f"{document.title}</title></head><body>{document.html_content}</body></html>"
-    )
-    return Response(
-        content=html,
-        media_type="application/msword",
-        headers={"Content-Disposition": f'attachment; filename="{safe}.doc"'},
-    )
+) -> StreamingResponse:
+    """Compatibility alias for older clients; the payload is now a real DOCX file."""
+    return await export_document_docx(document_id, session, user)

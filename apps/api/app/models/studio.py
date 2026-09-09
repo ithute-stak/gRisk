@@ -16,6 +16,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 
 
+def _empty_document() -> dict:
+    return {"type": "doc", "content": []}
+
+
 class StudioDocument(Base):
     __tablename__ = "studio_documents"
 
@@ -28,6 +32,7 @@ class StudioDocument(Base):
     style_key: Mapped[str] = mapped_column(String(80), default="guardrisk_orange", server_default="guardrisk_orange")
     status: Mapped[str] = mapped_column(String(32), default="draft", server_default="draft", index=True)
     visibility: Mapped[str] = mapped_column(String(32), default="private", server_default="private", index=True)
+    content_json: Mapped[dict] = mapped_column(JSONB, default=_empty_document, server_default='{"type":"doc","content":[]}')
     html_content: Mapped[str] = mapped_column(Text, default="<p></p>", server_default="<p></p>")
     plain_text: Mapped[str] = mapped_column(Text, default="", server_default="")
     settings: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
@@ -48,6 +53,7 @@ class StudioRevision(Base):
     )
     version: Mapped[int] = mapped_column(Integer)
     title: Mapped[str] = mapped_column(String(240))
+    content_json: Mapped[dict] = mapped_column(JSONB, default=_empty_document, server_default='{"type":"doc","content":[]}')
     html_content: Mapped[str] = mapped_column(Text)
     plain_text: Mapped[str] = mapped_column(Text, default="", server_default="")
     settings: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")

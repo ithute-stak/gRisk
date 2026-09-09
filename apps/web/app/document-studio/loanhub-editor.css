@@ -1,0 +1,47 @@
+.loanhub-studio-engine .office-paper-stage{padding-bottom:120px}
+.loanhub-studio-engine .document-paper-transform{flex:0 0 auto;transition:transform .16s ease}
+.loanhub-studio-engine .document-paper{box-sizing:border-box;transition:width .18s,min-height .18s,padding .18s}
+.loanhub-studio-engine .document-editor-content{min-height:720px;outline:none;color:#25272b}
+.loanhub-studio-engine .document-editor-content:focus{outline:none}
+.loanhub-studio-engine .document-editor-content p{margin:.55em 0}
+.loanhub-studio-engine .document-editor-content h1{margin:.5em 0;font-size:2em;line-height:1.15}
+.loanhub-studio-engine .document-editor-content h2{margin:.65em 0 .35em;font-size:1.45em}
+.loanhub-studio-engine .document-editor-content h3{margin:.6em 0 .3em;font-size:1.2em}
+.loanhub-studio-engine .document-editor-content ul,.loanhub-studio-engine .document-editor-content ol{padding-left:28px}
+.loanhub-studio-engine .document-editor-content blockquote{margin:14px 0;padding:4px 0 4px 14px;border-left:3px solid #f47a20;color:#5f6368}
+.loanhub-studio-engine .document-editor-content img{display:block;max-width:100%;height:auto;margin:12px auto}
+.loanhub-studio-engine .document-editor-content a{color:#b84d00;text-decoration:underline}
+.loanhub-studio-engine .document-editor-content table{width:100%;border-collapse:collapse;margin:14px 0;table-layout:fixed}
+.loanhub-studio-engine .document-editor-content th,.loanhub-studio-engine .document-editor-content td{min-width:70px;padding:8px;border:1px solid #aeb4bd;vertical-align:top}
+.loanhub-studio-engine .document-editor-content th{background:#fff4ec;font-weight:800}
+.loanhub-studio-engine .document-editor-content .selectedCell:after{content:"";position:absolute;inset:0;background:rgba(244,122,32,.12);pointer-events:none}
+.loanhub-studio-engine .document-editor-content .column-resize-handle{position:absolute;right:-2px;top:0;bottom:0;width:4px;background:#f47a20;pointer-events:none}
+.loanhub-studio-engine .document-editor-content.resize-cursor{cursor:col-resize}
+.loanhub-studio-engine .document-editor-content p.is-editor-empty:first-child:before{content:attr(data-placeholder);float:left;color:#a0a6af;pointer-events:none;height:0}
+.document-page-break{position:relative;height:34px;margin:24px -24px;border-top:2px dashed #aeb3ba;page-break-after:always}
+.document-page-break:after{content:"PAGE BREAK";position:absolute;left:50%;top:-9px;transform:translateX(-50%);padding:0 8px;background:#fff;color:#8b9199;font-size:9px;font-weight:800;letter-spacing:.08em}
+.document-signature-node{position:relative;display:flex;align-items:stretch;gap:8px;box-sizing:border-box;margin:10px 0;padding:10px;border:1px dashed #e17931;border-radius:8px;background:#fff9f5;color:#4f3421;cursor:default}
+.document-signature-node.is-selected{border-style:solid;border-color:#f47a20;box-shadow:0 0 0 2px rgba(244,122,32,.12)}
+.document-signature-drag{flex:0 0 18px;display:flex;align-items:center;justify-content:center;color:#9b734f;cursor:grab;user-select:none}
+.document-signature-body{min-width:0;flex:1}
+.document-signature-heading{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:11px}
+.document-signature-icon{font-size:14px}.document-signature-assignee,.document-signature-required-badge{padding:2px 7px;border-radius:999px;font-size:9px;font-weight:900;text-transform:uppercase}
+.document-signature-assignee{background:#ffe8d7;color:#a74600}.document-signature-required-badge{background:#fff0ef;color:#b42318}
+.document-signature-line{margin-top:15px;padding-bottom:4px;border-bottom:1px dashed #7f8790;color:#9aa0a7;font-size:10px}
+.document-signature-placeholder{margin-top:12px;color:#737a83;font-size:11px}
+.document-signature-properties{position:absolute;z-index:15;left:0;right:0;top:calc(100% + 7px);display:grid;grid-template-columns:minmax(150px,1.3fr) minmax(150px,1fr) 100px auto auto;gap:7px;align-items:end;padding:10px;border:1px solid #e0e3e7;border-radius:10px;background:#fff;box-shadow:0 12px 30px rgba(24,27,31,.16)}
+.document-signature-properties label{display:grid;gap:3px;font-size:9px;font-weight:800;color:#656b74}.document-signature-properties input,.document-signature-properties select{width:100%;height:30px;border:1px solid #d7dbe0;border-radius:6px;background:#fff;padding:0 7px;font-size:10px}
+.document-signature-properties .document-signature-required-toggle{display:flex;align-items:center;gap:5px;height:30px}.document-signature-properties .document-signature-required-toggle input{width:auto;height:auto}
+.document-signature-delete{height:30px;padding:0 9px;border:1px solid #f0bbb6;border-radius:6px;background:#fff4f3;color:#a32920;font-size:10px;font-weight:800}
+.document-signature-export{box-sizing:border-box;margin:10px 0;padding:9px;border:1px solid #e17931;border-left:4px solid #f47a20;border-radius:6px;background:#fff9f5}.document-signature-export-label{font-size:10px;font-weight:800;color:#6e421f}.document-signature-export-line{margin-top:12px;padding-bottom:4px;border-bottom:1px solid #87909a;color:#87909a;font-size:10px}
+.studio-field-palette{display:grid;gap:7px}.studio-field-palette button{display:grid!important;gap:3px!important;width:100%!important;margin:0!important;padding:9px!important;border:1px solid #dddfe3!important;border-radius:8px!important;background:#fff!important;text-align:left!important;cursor:grab}.studio-field-palette button:hover{border-color:#f2b386!important;background:#fff7f1!important}.studio-field-palette b{font-size:11px}.studio-field-palette small{color:#7a8088;font-size:9px}
+.office-style-gallery{max-width:520px;overflow-x:auto}.office-style-gallery button{min-width:max-content}
+.theme-classic_word .office-paper-brand,.theme-classic .office-paper-brand{border-color:#2f5597}.theme-classic_word .office-paper-g,.theme-classic .office-paper-g{background:#2f5597}.theme-classic_word .office-paper-brand strong,.theme-classic .office-paper-brand strong{color:#2f5597}
+.theme-executive_charcoal .office-paper-brand,.theme-executive .office-paper-brand{border-color:#30343b}.theme-executive_charcoal .office-paper-g,.theme-executive .office-paper-g{background:#30343b}.theme-executive_charcoal .office-paper-brand strong,.theme-executive .office-paper-brand strong{color:#30343b}
+.theme-legal_monochrome .office-paper-brand,.theme-legal .office-paper-brand{border-color:#111}.theme-legal_monochrome .office-paper-g,.theme-legal .office-paper-g{background:#111}.theme-legal_monochrome .office-paper-brand strong,.theme-legal .office-paper-brand strong{color:#111}
+.theme-warm_professional .office-paper-brand{border-color:#a4552a}.theme-warm_professional .office-paper-g{background:#a4552a}.theme-warm_professional .office-paper-brand strong{color:#a4552a}
+.theme-minimal_clean .office-paper-brand,.theme-clean .office-paper-brand{border-color:#94a3b8}.theme-minimal_clean .office-paper-g,.theme-clean .office-paper-g{background:#64748b}.theme-minimal_clean .office-paper-brand strong,.theme-clean .office-paper-brand strong{color:#475569}
+.theme-elegant .office-paper-brand{border-color:#7f6b49}.theme-elegant .office-paper-g{background:#7f6b49}.theme-elegant .office-paper-brand strong{color:#7f6b49}
+@media(max-width:900px){.document-signature-properties{grid-template-columns:1fr 1fr;position:static;margin-top:8px}.loanhub-studio-engine .office-paper-stage{justify-content:flex-start}}
+@media(max-width:620px){.document-signature-properties{grid-template-columns:1fr}.loanhub-studio-engine .document-paper-transform{transform:none!important}.loanhub-studio-engine .office-paper-stage{overflow:auto}}
+@media print{.document-signature-properties{display:none!important}.document-page-break{height:0;margin:0;border:0;page-break-after:always}.document-page-break:after{display:none}.document-signature-node{break-inside:avoid}}
