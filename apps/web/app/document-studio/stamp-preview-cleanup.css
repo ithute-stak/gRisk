@@ -1,0 +1,8 @@
+.guardrisk-digital-stamp b,
+.guardrisk-digital-stamp b + span{
+  display:none!important;
+}
+
+.guardrisk-digital-stamp > div{
+  row-gap:1mm!important;
+}
