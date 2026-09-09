@@ -78,7 +78,7 @@ def test_phone_normalization_always_adds_lesotho_country_code() -> None:
 
 def test_official_settings_lock_stationery_on_and_seed_editable_details() -> None:
     document = _document()
-    settings = official_settings({"brand_header": False}, document)
+    settings = official_settings(document.settings, document)
     assert settings["brand_header"] is True
     assert settings["official_letterhead"] == "guardrisk_editable_v4"
     assert settings["letterhead_date_time"] == CUSTOM_DATE
