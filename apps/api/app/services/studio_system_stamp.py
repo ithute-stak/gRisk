@@ -22,8 +22,6 @@ MASERU_TZ = ZoneInfo("Africa/Maseru")
 @dataclass(frozen=True)
 class SystemStamp:
     brand: str
-    legal_name: str
-    status: str
     issuer: str
     issued_date: str
     reference: str
@@ -48,8 +46,6 @@ def build_system_stamp(document: Any, *, issued_at: datetime | None = None) -> S
     reference_root = document_id[:8] or digest[:8]
     return SystemStamp(
         brand="GUARDRISK",
-        legal_name="INSURANCE BROKERS",
-        status="OFFICIAL",
         issuer="SYSTEM VERIFIED",
         issued_date=_backend_now(issued_at).strftime("%d %b %Y").upper(),
         reference=f"GR-{reference_root}-V{version}",
@@ -65,7 +61,7 @@ def draw_pdf_system_stamp(
     center_y: float,
     diameter: float,
 ) -> None:
-    """Draw the official stamp as vector artwork directly into the backend PDF."""
+    """Draw the system stamp as vector artwork directly into the backend PDF."""
     stamp = build_system_stamp(document)
     radius = diameter / 2
     orange = colors.HexColor(ORANGE)
@@ -75,7 +71,7 @@ def draw_pdf_system_stamp(
 
     canvas.saveState()
 
-    # Solid white face with a formal double-ring seal.
+    # Clean white face with a restrained double-ring seal.
     canvas.setFillColor(colors.white)
     canvas.circle(center_x, center_y, radius, stroke=0, fill=1)
     canvas.setStrokeColor(orange)
@@ -85,51 +81,45 @@ def draw_pdf_system_stamp(
     canvas.setLineWidth(0.9)
     canvas.circle(center_x, center_y, radius - 5.4, stroke=1, fill=0)
 
-    # Brand lockup.
+    # Brand lockup only — intentionally no legal-name or OFFICIAL wording.
     canvas.setFillColor(orange)
-    canvas.setFont("Helvetica-Bold", 7.8)
+    canvas.setFont("Helvetica-Bold", 8.6)
     canvas.drawCentredString(center_x, center_y + radius * 0.53, stamp.brand)
-    canvas.setFillColor(navy)
-    canvas.setFont("Helvetica-Bold", 4.2)
-    canvas.drawCentredString(center_x, center_y + radius * 0.39, stamp.legal_name)
 
-    # Central official mark.
-    mark_y = center_y + radius * 0.12
-    mark_radius = radius * 0.16
+    # Central Guardrisk mark.
+    mark_y = center_y + radius * 0.18
+    mark_radius = radius * 0.18
     canvas.setFillColor(orange)
     canvas.circle(center_x, mark_y, mark_radius, stroke=0, fill=1)
     canvas.setFillColor(colors.white)
-    canvas.setFont("Times-Bold", 10.5)
-    canvas.drawCentredString(center_x, mark_y - 3.5, "G")
+    canvas.setFont("Times-Bold", 11.5)
+    canvas.drawCentredString(center_x, mark_y - 3.8, "G")
 
     canvas.setFillColor(navy)
-    canvas.setFont("Helvetica-Bold", 9.3)
-    canvas.drawCentredString(center_x, center_y - radius * 0.10, stamp.status)
-    canvas.setFont("Helvetica-Bold", 4.6)
-    canvas.drawCentredString(center_x, center_y - radius * 0.23, stamp.issuer)
+    canvas.setFont("Helvetica-Bold", 5.2)
+    canvas.drawCentredString(center_x, center_y - radius * 0.08, stamp.issuer)
 
-    # A dedicated date band makes the backend issue date obvious and legible.
-    band_width = radius * 1.20
-    band_height = radius * 0.25
+    # Dedicated date capsule keeps the backend-issued date prominent.
+    band_width = radius * 1.22
+    band_height = radius * 0.27
     band_x = center_x - band_width / 2
-    band_y = center_y - radius * 0.48
+    band_y = center_y - radius * 0.42
     canvas.setFillColor(pale)
     canvas.setStrokeColor(orange)
     canvas.setLineWidth(0.6)
     canvas.roundRect(band_x, band_y, band_width, band_height, band_height / 2, stroke=1, fill=1)
     canvas.setFillColor(navy)
-    canvas.setFont("Helvetica-Bold", 4.9)
-    canvas.drawCentredString(center_x, band_y + band_height * 0.34, f"DATE  {stamp.issued_date}")
+    canvas.setFont("Helvetica-Bold", 5.0)
+    canvas.drawCentredString(center_x, band_y + band_height * 0.35, f"DATE  {stamp.issued_date}")
 
-    # Traceability stays present but visually secondary.
+    # Traceability remains secondary and unobtrusive.
     canvas.setFillColor(navy)
-    canvas.setFont("Helvetica-Bold", 4.2)
-    canvas.drawCentredString(center_x, center_y - radius * 0.66, stamp.reference)
+    canvas.setFont("Helvetica-Bold", 4.3)
+    canvas.drawCentredString(center_x, center_y - radius * 0.62, stamp.reference)
     canvas.setFillColor(muted)
-    canvas.setFont("Helvetica", 3.4)
-    canvas.drawCentredString(center_x, center_y - radius * 0.79, f"VERIFY {stamp.content_hash}")
+    canvas.setFont("Helvetica", 3.5)
+    canvas.drawCentredString(center_x, center_y - radius * 0.77, f"VERIFY {stamp.content_hash}")
 
-    # Small registration dots balance the seal without cluttering it.
     canvas.setFillColor(orange)
     dot_radius = max(0.9, radius * 0.03)
     canvas.circle(center_x - radius * 0.73, center_y, dot_radius, stroke=0, fill=1)
@@ -155,7 +145,7 @@ def _centered(
 
 
 def render_system_stamp_png(document: Any, *, size: int = 900) -> bytes:
-    """Render the same official seal as a high-resolution backend PNG for DOCX."""
+    """Render the same system seal as a high-resolution backend PNG for DOCX."""
     stamp = build_system_stamp(document)
     image = Image.new("RGBA", (size, size), (255, 255, 255, 0))
     draw = ImageDraw.Draw(image)
@@ -178,16 +168,15 @@ def render_system_stamp_png(document: Any, *, size: int = 900) -> bytes:
         width=stroke_inner,
     )
 
-    _centered(draw, center, size * 0.145, stamp.brand, _font(int(size * 0.072)), ORANGE)
-    _centered(draw, center, size * 0.225, stamp.legal_name, _font(int(size * 0.032)), NAVY)
+    _centered(draw, center, size * 0.16, stamp.brand, _font(int(size * 0.078)), ORANGE)
 
-    mark_radius = int(size * 0.075)
-    mark_y = int(size * 0.385)
+    mark_radius = int(size * 0.082)
+    mark_y = int(size * 0.355)
     draw.ellipse(
         (center - mark_radius, mark_y - mark_radius, center + mark_radius, mark_y + mark_radius),
         fill=ORANGE,
     )
-    mark_font = _font(int(size * 0.085))
+    mark_font = _font(int(size * 0.092))
     mark_box = draw.textbbox((0, 0), "G", font=mark_font)
     mark_w = mark_box[2] - mark_box[0]
     mark_h = mark_box[3] - mark_box[1]
@@ -198,22 +187,21 @@ def render_system_stamp_png(document: Any, *, size: int = 900) -> bytes:
         fill=WHITE,
     )
 
-    _centered(draw, center, size * 0.475, stamp.status, _font(int(size * 0.092)), NAVY)
-    _centered(draw, center, size * 0.585, stamp.issuer, _font(int(size * 0.035)), NAVY)
+    _centered(draw, center, size * 0.475, stamp.issuer, _font(int(size * 0.042)), NAVY)
 
     # Prominent professional date capsule.
-    band_left = int(size * 0.225)
-    band_top = int(size * 0.655)
-    band_right = int(size * 0.775)
-    band_bottom = int(size * 0.735)
+    band_left = int(size * 0.215)
+    band_top = int(size * 0.585)
+    band_right = int(size * 0.785)
+    band_bottom = int(size * 0.675)
     draw.rounded_rectangle(
         (band_left, band_top, band_right, band_bottom),
-        radius=int(size * 0.04),
+        radius=int(size * 0.045),
         fill=PALE,
         outline=ORANGE,
         width=max(2, int(size * 0.0035)),
     )
-    date_font = _font(int(size * 0.036))
+    date_font = _font(int(size * 0.039))
     date_text = f"DATE  {stamp.issued_date}"
     date_box = draw.textbbox((0, 0), date_text, font=date_font)
     date_w = date_box[2] - date_box[0]
@@ -225,8 +213,8 @@ def render_system_stamp_png(document: Any, *, size: int = 900) -> bytes:
         fill=NAVY,
     )
 
-    _centered(draw, center, size * 0.765, stamp.reference, _font(int(size * 0.031)), NAVY)
-    _centered(draw, center, size * 0.815, f"VERIFY {stamp.content_hash}", _font(int(size * 0.024)), MUTED)
+    _centered(draw, center, size * 0.72, stamp.reference, _font(int(size * 0.034)), NAVY)
+    _centered(draw, center, size * 0.785, f"VERIFY {stamp.content_hash}", _font(int(size * 0.026)), MUTED)
 
     dot = max(5, int(size * 0.012))
     draw.ellipse((size * 0.125 - dot, center - dot, size * 0.125 + dot, center + dot), fill=ORANGE)
