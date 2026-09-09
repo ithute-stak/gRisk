@@ -19,6 +19,7 @@ from app.models.notification import Notification
 from app.models.partner import Partner
 from app.models.portal import CustomerPortalAccess
 from app.models.risk import RiskAssessment, RiskRegisterItem
+from app.models.studio import StudioCollaborator, StudioDocument, StudioRevision
 
 __all__ = [
     "AuditEvent",
@@ -50,6 +51,9 @@ __all__ = [
     "RiskAssessment",
     "RiskRegisterItem",
     "Role",
+    "StudioCollaborator",
+    "StudioDocument",
+    "StudioRevision",
     "User",
     "user_roles",
 ]

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="54mm" viewBox="0 0 210 54">
+  <path d="M0 0H76C52 2 29 7 0 20Z" fill="#F15A24"/>
+  <path d="M0 20C25 9 45 4 72 1" fill="none" stroke="#F7B38C" stroke-width="2"/>
+  <path d="M0 22C24 11 46 5 70 2" fill="none" stroke="#FFFFFF" stroke-width="1.1" opacity="0.95"/>
+
+  <circle cx="105" cy="11.5" r="8.3" fill="#F15A24"/>
+  <text x="105" y="15" text-anchor="middle" fill="#FFFFFF" font-family="Georgia,Times New Roman,serif" font-size="10" font-weight="700">G</text>
+  <text x="105" y="28" text-anchor="middle" fill="#F15A24" font-family="Georgia,Times New Roman,serif" font-size="8.4" font-weight="700">GUARDRISK</text>
+  <line x1="63" y1="32.2" x2="78" y2="32.2" stroke="#3D4653" stroke-width="0.35"/>
+  <text x="105" y="33.3" text-anchor="middle" fill="#3D4653" font-family="Arial,Helvetica,sans-serif" font-size="2.8" letter-spacing="1.1">DOCUMENT STUDIO</text>
+  <line x1="132" y1="32.2" x2="147" y2="32.2" stroke="#3D4653" stroke-width="0.35"/>
+
+  <line x1="18" y1="43" x2="60" y2="43" stroke="#F15A24" stroke-width="0.45"/>
+  <text x="105" y="44" text-anchor="middle" fill="#596579" font-family="Arial,Helvetica,sans-serif" font-size="2.7" letter-spacing="0.7">YOUR LINK TO PREMIER HEALTHCARE</text>
+  <line x1="150" y1="43" x2="192" y2="43" stroke="#F15A24" stroke-width="0.45"/>
+  <path d="M18 49C43 46 68 52 94 49S145 46 192 49" fill="none" stroke="#F15A24" stroke-width="0.55" opacity="0.8"/>
+</svg>

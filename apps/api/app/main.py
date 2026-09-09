@@ -26,6 +26,7 @@ from app.api.routes.partners import router as partners_router
 from app.api.routes.portal import router as portal_router
 from app.api.routes.reports import router as reports_router
 from app.api.routes.risk import router as risk_router
+from app.api.routes.studio_documents import router as studio_documents_router
 from app.core.config import get_settings
 from app.core.redis import redis_client
 from app.core.security import TokenError, decode_access_token
@@ -121,6 +122,7 @@ app.include_router(risk_router, prefix="/api/v1")
 app.include_router(finance_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(document_studio_router, prefix="/api/v1")
+app.include_router(studio_documents_router, prefix="/api/v1")
 app.include_router(partners_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
 app.include_router(portal_router, prefix="/api/v1")
@@ -147,7 +149,6 @@ def _websocket_origin_allowed(websocket: WebSocket) -> bool:
 async def _websocket_user(websocket: WebSocket) -> User | None:
     token = websocket.cookies.get(SESSION_COOKIE_NAME)
     if not token and settings.environment.lower() != "production":
-        # Development-only compatibility for non-browser WebSocket clients.
         token = websocket.query_params.get("access_token")
     if not token:
         return None
@@ -191,8 +192,6 @@ async def websocket_endpoint(websocket: WebSocket, channel: str) -> None:
     await manager.connect(channel, websocket)
     try:
         while True:
-            # Realtime channels are server-published. Client messages are only
-            # consumed to detect disconnects and are never rebroadcast.
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(channel, websocket)
