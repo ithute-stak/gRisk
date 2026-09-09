@@ -34,7 +34,7 @@ def test_stamp_uses_backend_export_date_and_traceable_reference() -> None:
     assert stamp.legal_name == "INSURANCE BROKERS"
     assert stamp.status == "OFFICIAL"
     assert stamp.issuer == "SYSTEM VERIFIED"
-    assert stamp.reference == "GR-AAAAAAA A-V7".replace(" ", "")
+    assert stamp.reference == "GR-AAAAAAAA-V7"
     assert len(stamp.content_hash) == 10
 
 
